@@ -3,6 +3,7 @@ import java.awt.*;
 import java.util.*;
 import java.util.List;
 import javax.swing.*;
+import javax.swing.Timer;
 
 public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RPG
     private static final int GRID_SIZE = 8;
@@ -213,6 +214,11 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
             
             JOptionPane.showMessageDialog(this,
                 String.format("You dealt %d dmg, +%d Gems", gaindmg, gainG));
+            
+            new Timer(1000, e -> {
+                playerImgLabel.setIcon(icons.get("hero_idle"));
+                ((Timer)e.getSource()).stop();
+            }).start();
                 
             gridModel.removeAndCollapse(selectedPos);
             refreshGrid();
@@ -236,30 +242,62 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     }
 
     private void performEnemyAction() {
-        int len = 3 + new Random().nextInt(3);
-        int gained = 0;
-        Random r = new Random();
-        for (int i=0; i<len; i++){
-            Tile t = gridModel.getTile(r.nextInt(GRID_SIZE), r.nextInt(GRID_SIZE));
-            gained += t.dmgPts;
-        }
-
-        if (shieldActive) {
-            int dmg = gained / 2;
-            player.hp -= dmg;
-            JOptionPane.showMessageDialog(this,
-                String.format("Shield reduced the attack by 50%%! You took %d dmg.", dmg));
-            shieldActive = false;
+        Random rand = new Random();
+        boolean isBoss = (currentLevel % 5 == 0);
+        double chance = rand.nextDouble();
+    
+        if ((isBoss && chance < 0.25) || (!isBoss && chance < 0.10)) {
+            monster.hp = Math.min(monster.maxHp, monster.hp + 15);
+            monsterImgLabel.setIcon(getMonsterIcon("heal"));
+            new Timer(1000, e -> {
+                monsterImgLabel.setIcon(getMonsterIcon("idle"));
+                ((Timer)e.getSource()).stop();
+            }).start();
+            JOptionPane.showMessageDialog(this, monster.name + " healed itself for 15 HP!");
+    
+        } else if ((isBoss && chance < 0.50) || (!isBoss && chance < 0.20)) {
+            monster.setShield(true);
+            monsterImgLabel.setIcon(getMonsterIcon("defend"));
+            new Timer(1000, e -> {
+                monsterImgLabel.setIcon(getMonsterIcon("idle"));
+                ((Timer)e.getSource()).stop();
+            }).start();
+            JOptionPane.showMessageDialog(this, monster.name + " is defending!");
+    
         } else {
-            player.hp -= gained;
+            int len = 3 + rand.nextInt(3);
+            int dmg = 0;
+            for (int i = 0; i < len; i++) {
+                Tile t = gridModel.getTile(rand.nextInt(GRID_SIZE), rand.nextInt(GRID_SIZE));
+                dmg += t.dmgPts;
+            }
+    
+            if (monster.isShieldActive()) {
+                dmg /= 2;
+                monster.setShield(false);
+                JOptionPane.showMessageDialog(this,
+                    String.format("%s's shield halved the damage!", monster.name));
+            }
+    
+            if (shieldActive) {
+                dmg /= 2;
+                shieldActive = false;
+                JOptionPane.showMessageDialog(this,
+                    String.format("Your shield blocked 50%%! You took %d dmg.", dmg));
+            }
+    
+            player.hp -= dmg;
+            monsterImgLabel.setIcon(getMonsterIcon("attack"));
+            new Timer(1000, e -> {
+                monsterImgLabel.setIcon(getMonsterIcon("idle"));
+                ((Timer)e.getSource()).stop();
+            }).start();
             JOptionPane.showMessageDialog(this,
-                String.format("%s dealt %d dmg to you!", monster.name, gained));
+                String.format("%s dealt %d dmg to you!", monster.name, dmg));
         }
-
-        monsterImgLabel.setIcon(getMonsterIcon("idle"));
-        playerImgLabel.setIcon(icons.get("hero_idle"));
+    
         updateStatusLabels();
-        if (player.hp<=0) {
+        if (player.hp <= 0) {
             JOptionPane.showMessageDialog(this, "You have been defeated...");
             System.exit(0);
         }
@@ -290,10 +328,11 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
             System.exit(0);
         }
         monster = createMonsterForLevel(currentLevel);
+        monsterImgLabel.setIcon(getMonsterIcon("idle")); // <––– อัปเดตรูปใหม่ให้ตรงกับมอนสเตอร์ใหม่
         JOptionPane.showMessageDialog(this,
             "Level up! Now facing " + monster.name);
         gridModel = new Grid(GRID_SIZE);
-        refreshGrid();      // <–– แทน loop เดิม
+        refreshGrid();
         clearSelection();
         updateStatusLabels();
     }
@@ -313,19 +352,35 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                 null, options, options[0]);
             if (choice < 0 || choice == options.length - 1) break;
             switch (choice) {
-                case 0:
-                    if (totalGems>=5) {
+                case 0: // Heal
+                    if (totalGems >= 5) {
                         totalGems -= 5;
                         player.hp = Math.min(player.maxHp, player.hp + 20);
+                        playerImgLabel.setIcon(icons.get("hero_heal"));
+                        new Timer(1000, e -> {
+                            playerImgLabel.setIcon(icons.get("hero_idle"));
+                            ((Timer)e.getSource()).stop();
+                        }).start();
+    
                         JOptionPane.showMessageDialog(this, "Healed 20 HP!");
-                    } else JOptionPane.showMessageDialog(this, "Not enough Gems");
+                    } else {
+                        JOptionPane.showMessageDialog(this, "Not enough Gems");
+                    }
                     break;
-                case 1:
-                    if (totalGems>=3) {
+                case 1: // Shield
+                    if (totalGems >= 3) {
                         totalGems -= 3;
                         shieldActive = true;
+                        playerImgLabel.setIcon(icons.get("hero_defend"));
+                        new Timer(1000, e -> {
+                            playerImgLabel.setIcon(icons.get("hero_idle"));
+                            ((Timer)e.getSource()).stop();
+                        }).start();
+    
                         JOptionPane.showMessageDialog(this, "Shield ready! Next attack will be reduced.");
-                    } else JOptionPane.showMessageDialog(this, "Not enough Gems");
+                    } else {
+                        JOptionPane.showMessageDialog(this, "Not enough Gems");
+                    }
                     break;
                 case 2:
                     if (totalGems>=4) {

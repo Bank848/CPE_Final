@@ -1,13 +1,12 @@
-// Tile.java
-/** แทนตัวอักษรบนกริด พร้อมคะแนน Black/Blue */
-public class Tile {
-    public char letter;
-    public int blackPts;
-    public int bluePts;
+    // Tile.java
+    public class Tile {
+        public char letter;
+        public int dmgPts;
+        public int gemPts;
 
-    public Tile(char letter, int blackPts, int bluePts) {
-        this.letter = letter;
-        this.blackPts = blackPts;
-        this.bluePts = bluePts;
+        public Tile(char letter, int dmgPts, int gemPts) {
+            this.letter = letter;
+            this.dmgPts = dmgPts;
+            this.gemPts = gemPts;
+        }
     }
-}

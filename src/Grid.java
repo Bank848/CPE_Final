@@ -12,7 +12,6 @@ public class Grid {
         generateRandomGrid();
     }
 
-    // เปลี่ยนเป็น protected เพื่อให้เรียกจากภายนอกได้
     protected void generateRandomGrid() {
         for (int r = 0; r < size; r++) {
             for (int c = 0; c < size; c++) {
@@ -52,7 +51,6 @@ public class Grid {
         }
     }
 
-    /** ฟังก์ชันใหม่สำหรับสุ่มทั้งกระดาน */
     public void shuffle() {
         generateRandomGrid();
     }

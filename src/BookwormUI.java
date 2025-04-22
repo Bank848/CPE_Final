@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.List;
 import javax.swing.*;
 
-public class BookwormUI extends JFrame {
+public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RPG
     private static final int GRID_SIZE = 8;
     private static final int MAX_LEVEL = 20;
     private static final boolean DEV_MODE = true;
@@ -18,17 +18,17 @@ public class BookwormUI extends JFrame {
     private Entity player;
     private Entity monster;
     private int currentLevel = 1;
-    private int totalBlackPts = 0;
-    private int totalGems     = 0;    // เปลี่ยนชื่อเป็น Gems
+    private int totaldmgPts = 0;
+    private int totalGems     = 0;
     private boolean shieldActive = false;
 
-    private JLabel wordLabel, blackPtLabel, gemLabel;    // เปลี่ยน bluePtLabel → gemLabel
+    private JLabel wordLabel, dmgPtLabel, gemLabel;
     private JLabel playerHpLabel, monsterHpLabel;
     private JLabel playerImgLabel, monsterImgLabel;
 
     private Map<String, ImageIcon> icons = new HashMap<>();
 
-    public BookwormUI() {
+    public BookwormUI() { // Constructor to initialize the game UI
         super("Bookworm Puzzle RPG");
         loadIcons();
         gridModel    = new Grid(GRID_SIZE);
@@ -42,7 +42,7 @@ public class BookwormUI extends JFrame {
         updateStatusLabels();
     }
 
-    private void loadIcons() {
+    private void loadIcons() { // Load icons for the game
         String[] states = {"idle","attack","defend","heal"};
         for (String st: states) {
             icons.put("hero_"+st, new ImageIcon(getClass().getResource("./images/hero_"+st+".png")));
@@ -56,16 +56,16 @@ public class BookwormUI extends JFrame {
         }
     }
 
-    private Entity createMonsterForLevel(int lvl) {
+    private Entity createMonsterForLevel(int lvl) { // Create a monster based on the current level
         boolean isBoss = (lvl % 5 == 0);
         int baseHp = isBoss ? 80 + lvl*5 : 40 + lvl*3;
         return new Entity(isBoss ? "Boss Lv."+lvl : "Goblin Lv."+lvl, baseHp);
     }
 
-    private void initUI() {
+    private void initUI() { // Initialize the UI components and layout
         setLayout(new BorderLayout(5,5));
 
-        // === Top Panel ===
+        // Top Panel
         JPanel top = new JPanel(new BorderLayout(10,10));
         top.setBorder(BorderFactory.createEmptyBorder(10,10,10,10));
         JPanel status = new JPanel(new GridLayout(2,2,5,5));
@@ -73,16 +73,15 @@ public class BookwormUI extends JFrame {
 
         playerHpLabel  = new JLabel();
         monsterHpLabel = new JLabel();
-        blackPtLabel   = new JLabel("Black Pts: 0");
+        dmgPtLabel   = new JLabel("Damage: 0");
         gemLabel       = new JLabel("Gems: 0");
 
-        // ตกแต่งสีและฟอนต์
         gemLabel.setFont(gemLabel.getFont().deriveFont(Font.BOLD, 14f));
-        gemLabel.setForeground(new Color(128,0,128));  // สี Purple
+        gemLabel.setForeground(new Color(128,0,128));  // สีม่วง
 
         status.add(playerHpLabel);
         status.add(monsterHpLabel);
-        status.add(blackPtLabel);
+        status.add(dmgPtLabel);
         status.add(gemLabel);
 
         playerImgLabel  = new JLabel(icons.get("hero_idle"));
@@ -93,7 +92,7 @@ public class BookwormUI extends JFrame {
         top.add(monsterImgLabel,  BorderLayout.EAST);
         add(top, BorderLayout.NORTH);
 
-        // === Center Grid ===
+        // Center Grid
         JPanel gridPanel = new JPanel(new GridLayout(GRID_SIZE, GRID_SIZE,2,2));
         gridPanel.setBorder(BorderFactory.createLineBorder(Color.DARK_GRAY, 2));
         buttons = new JButton[GRID_SIZE][GRID_SIZE];
@@ -102,7 +101,7 @@ public class BookwormUI extends JFrame {
                 Tile t = gridModel.getTile(r,c);
                 JButton btn = new JButton(String.format(
                     "<html><center>%c<br><font color='black'>%d</font> / <font color='purple'>%d</font></center></html>",
-                    t.letter, t.blackPts, t.bluePts));
+                    t.letter, t.dmgPts, t.gemPts));
                 btn.setFont(new Font("Monospaced", Font.PLAIN, 16));
                 btn.putClientProperty("pos", new Position(r,c));
                 btn.addActionListener(e -> onLetterClick((JButton)e.getSource()));
@@ -112,7 +111,7 @@ public class BookwormUI extends JFrame {
         }
         add(gridPanel, BorderLayout.CENTER);
 
-        // === Bottom Controls ===
+        // Bottom Controls
         JPanel control = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
         control.setBorder(BorderFactory.createTitledBorder("Controls"));
 
@@ -129,7 +128,7 @@ public class BookwormUI extends JFrame {
         control.add(clearBtn);
         control.add(shopBtn);
 
-        if (DEV_MODE) {
+        if (DEV_MODE) { // Developer mode: add a button to skip levels
             JButton skipBtn = new JButton("Skip Level");
             skipBtn.addActionListener(e -> nextLevel());
             control.add(skipBtn);
@@ -143,25 +142,34 @@ public class BookwormUI extends JFrame {
         setVisible(true);
     }
 
-    private ImageIcon getMonsterIcon(String state) {
+    private ImageIcon getMonsterIcon(String state) { // Get the icon for the monster based on its state
         String keyBase = (currentLevel%5==0) ? "boss"+currentLevel : "enemy"+currentLevel;
         return icons.get(keyBase+"_"+state);
     }
 
-    private void updateStatusLabels() {
+    private void updateStatusLabels() { // Update the status labels with current player and monster stats
         playerHpLabel .setText(player.name + " HP: "   + player.hp + "/" + player.maxHp);
         monsterHpLabel.setText(monster.name + " HP: "  + monster.hp + "/" + monster.maxHp);
-        blackPtLabel  .setText("Black Pts: " + totalBlackPts);
+        dmgPtLabel  .setText("Damage: " + totaldmgPts);
         gemLabel      .setText("Gems: "     + totalGems);
     }
 
     private void onLetterClick(JButton btn) {
         Position p = (Position)btn.getClientProperty("pos");
+        if (selectedPos.contains(p)) { // If already selected, remove it
+            int idx = selectedPos.indexOf(p);
+            selectedBtn.get(idx).setBackground(null);
+            selectedPos.remove(idx);
+            selectedBtn.remove(idx);
+            updateWordLabel();
+            return;
+        }
         if (!selectedPos.isEmpty()) {
             Position last = selectedPos.get(selectedPos.size()-1);
-            if (Math.abs(p.row-last.row)>1 || Math.abs(p.col-last.col)>1) return;
+            if (Math.abs(p.row - last.row) > 1 || Math.abs(p.col - last.col) > 1) {
+                return;
+            }
         }
-        if (selectedPos.contains(p)) return;
         selectedPos.add(p);
         selectedBtn.add(btn);
         btn.setBackground(Color.YELLOW);
@@ -193,19 +201,18 @@ public class BookwormUI extends JFrame {
             JOptionPane.showMessageDialog(this, "\""+ word +"\" is not valid.");
             playerImgLabel.setIcon(icons.get("hero_idle"));
         } else {
-            int gainB = 0, gainG = 0;
+            int gaindmg = 0, gainG = 0;
             for (Position p : selectedPos) {
                 Tile t = gridModel.getTile(p.row, p.col);
-                gainB += t.blackPts;
-                gainG += t.bluePts;
+                gaindmg += t.dmgPts;
+                gainG += t.gemPts;
             }
-            totalBlackPts += gainB;
+            totaldmgPts += gaindmg;
             totalGems    += gainG;
-            monster.hp   -= gainB + player.buffAttack;
+            monster.hp   -= gaindmg + player.buffAttack;
             
-            // แสดงข้อความให้ใช้ G แทน L (L = bluePts เดิม)
             JOptionPane.showMessageDialog(this,
-                String.format("You dealt %d dmg, +%d Black, +%d Gems", gainB, gainB, gainG));
+                String.format("You dealt %d dmg, +%d Gems", gaindmg, gainG));
                 
             gridModel.removeAndCollapse(selectedPos);
             refreshGrid();
@@ -234,7 +241,7 @@ public class BookwormUI extends JFrame {
         Random r = new Random();
         for (int i=0; i<len; i++){
             Tile t = gridModel.getTile(r.nextInt(GRID_SIZE), r.nextInt(GRID_SIZE));
-            gained += t.blackPts;
+            gained += t.dmgPts;
         }
 
         if (shieldActive) {
@@ -271,28 +278,22 @@ public class BookwormUI extends JFrame {
                 Tile t = gridModel.getTile(r,c);
                 buttons[r][c].setText(String.format(
                     "<html><center>%c<br><font color='black'>%d</font> / <font color='purple'>%d</font></center></html>",
-                    t.letter, t.blackPts, t.bluePts));
+                    t.letter, t.dmgPts, t.gemPts));
             }
         }
     }
 
     private void nextLevel() {
         currentLevel++;
-        if (currentLevel>MAX_LEVEL) {
+        if (currentLevel > MAX_LEVEL) {
             JOptionPane.showMessageDialog(this, "You WIN! 🎉");
             System.exit(0);
         }
         monster = createMonsterForLevel(currentLevel);
         JOptionPane.showMessageDialog(this,
-            String.format("Level up! Now facing %s", monster.name));
-        monsterImgLabel.setIcon(getMonsterIcon("idle"));
+            "Level up! Now facing " + monster.name);
         gridModel = new Grid(GRID_SIZE);
-        for (int r=0; r<GRID_SIZE; r++) for (int c=0; c<GRID_SIZE; c++) {
-            Tile t = gridModel.getTile(r,c);
-            buttons[r][c].setText(String.format(
-                "<html><center>%c<br><font color='black'>%d</font> / <font color='blue'>%d</font></center></html>",
-                t.letter, t.blackPts, t.bluePts));
-        }
+        refreshGrid();      // <–– แทน loop เดิม
         clearSelection();
         updateStatusLabels();
     }
@@ -302,7 +303,7 @@ public class BookwormUI extends JFrame {
             "Heal (5 Gems)",
             "Shield (3 Gems)",
             "BuffAtk (4 Gems)",
-            "Shuffle (6 Gems)",    // เพิ่มตัวเลือก
+            "Shuffle (6 Gems)",
             "Close"
         };
         while (true) {
@@ -336,7 +337,7 @@ public class BookwormUI extends JFrame {
                 case 3:
                     if (totalGems>=6) {
                         totalGems -= 6;
-                        gridModel.shuffle();    // สุ่มกระดานใหม่ทั้งหมด
+                        gridModel.shuffle();
                         refreshGrid();
                         clearSelection();
                         JOptionPane.showMessageDialog(this, "Board shuffled!");

@@ -3,8 +3,7 @@
 public class Entity {
     public String name;
     public int hp, maxHp;
-    public int buffAttack;  // เพิ่มพลังโจมตีชั่วคราว
-
+    public int buffAttack;
     public Entity(String name, int maxHp) {
         this.name = name;
         this.maxHp = maxHp;

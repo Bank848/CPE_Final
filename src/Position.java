@@ -1,7 +1,7 @@
 // Position.java
 import java.util.Objects;
 
-public class Position {
+public class Position { // คลาสตำแหน่งในกริด
     public int row, col;
 
     public Position(int row, int col) {

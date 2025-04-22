@@ -1,7 +1,7 @@
 // Grid.java
 import java.util.*;
 
-public class Grid {
+public class Grid { // คลาสกริด
     private Tile[][] grid;
     private int size;
     private Random rand = new Random();
@@ -23,11 +23,11 @@ public class Grid {
         }
     }
 
-    public Tile getTile(int r, int c) {
+    public Tile getTile(int r, int c) { // ฟังก์ชันสำหรับดึงข้อมูล Tile ที่ตำแหน่ง (r, c)
         return grid[r][c];
     }
 
-    public int getSize() {
+    public int getSize() { // ฟังก์ชันสำหรับดึงขนาดของกริด
         return size;
     }
 
@@ -51,7 +51,7 @@ public class Grid {
         }
     }
 
-    public void shuffle() {
+    public void shuffle() { // ฟังก์ชันสำหรับสุ่มกริดใหม่
         generateRandomGrid();
     }
 }

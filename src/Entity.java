@@ -1,6 +1,6 @@
 // Entity.java
-/** คลาสแทนผู้เล่นหรือมอนสเตอร์ */
-public class Entity {
+// คลาสผู้เล่นและมอนสเตอร์
+public class Entity { 
     public String name;
     public int hp, maxHp;
     public int buffAttack;
@@ -12,10 +12,10 @@ public class Entity {
         this.buffAttack = 0;
     }
 
-    public boolean isAlive() {
+    public boolean isAlive() { // ฟังก์ชันเช็คว่าผู้เล่นยังมีชีวิตอยู่หรือไม่
         return hp > 0;
     }
 
-    public void setShield(boolean v) { shieldActive = v; }
+    public void setShield(boolean v) { shieldActive = v; } 
     public boolean isShieldActive()   { return shieldActive; }    
 }

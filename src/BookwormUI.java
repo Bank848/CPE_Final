@@ -155,7 +155,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         gemLabel      .setText("Gems: "     + totalGems);
     }
 
-    private void onLetterClick(JButton btn) {
+    private void onLetterClick(JButton btn) { // Handle letter button click event
         Position p = (Position)btn.getClientProperty("pos");
         if (selectedPos.contains(p)) { // If already selected, remove it
             int idx = selectedPos.indexOf(p);
@@ -177,13 +177,13 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         updateWordLabel();
     }
 
-    private void updateWordLabel() {
+    private void updateWordLabel() { // Update the word label with the current selected letters
         StringBuilder sb = new StringBuilder();
         for (Position p : selectedPos) sb.append(gridModel.getTile(p.row,p.col).letter);
         wordLabel.setText("Current: " + sb.toString().toLowerCase());
     }
 
-    private void onSubmit() {
+    private void onSubmit() { // Handle the submit button click event
         playerImgLabel.setIcon(icons.get("hero_attack"));
         SwingUtilities.invokeLater(() -> {
             try { Thread.sleep(300); } catch (Exception ign) {}
@@ -191,7 +191,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         });
     }
 
-    private void performPlayerAction() {
+    private void performPlayerAction() { // Perform the player's action based on the selected letters
         StringBuilder sb = new StringBuilder();
         for (Position p : selectedPos) sb.append(gridModel.getTile(p.row,p.col).letter);
         String word = sb.toString().toLowerCase();
@@ -215,8 +215,8 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
             JOptionPane.showMessageDialog(this,
                 String.format("You dealt %d dmg, +%d Gems", gaindmg, gainG));
             
-            new Timer(1000, e -> {
-                playerImgLabel.setIcon(icons.get("hero_idle"));
+            new Timer(1000, e -> { // Delay to show attack animation
+                playerImgLabel.setIcon(icons.get("hero_idle")); // Reset to idle icon
                 ((Timer)e.getSource()).stop();
             }).start();
                 
@@ -233,20 +233,20 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         updateStatusLabels();
     }
 
-    private void enemyTurn() {
+    private void enemyTurn() { // Handle the enemy's turn after the player attacks
         monsterImgLabel.setIcon(getMonsterIcon("attack"));
         SwingUtilities.invokeLater(() -> {
-            try { Thread.sleep(500); } catch (Exception ign) {}
+            try { Thread.sleep(1000); } catch (Exception ign) {}
             performEnemyAction();
         });
     }
 
-    private void performEnemyAction() {
+    private void performEnemyAction() { // Perform the monster's action
         Random rand = new Random();
         boolean isBoss = (currentLevel % 5 == 0);
         double chance = rand.nextDouble();
     
-        if ((isBoss && chance < 0.25) || (!isBoss && chance < 0.10)) {
+        if ((isBoss && chance < 0.25) || (!isBoss && chance < 0.10)) { // 25% chance to heal // 10% for normal
             monster.hp = Math.min(monster.maxHp, monster.hp + 15);
             monsterImgLabel.setIcon(getMonsterIcon("heal"));
             new Timer(1000, e -> {
@@ -255,7 +255,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
             }).start();
             JOptionPane.showMessageDialog(this, monster.name + " healed itself for 15 HP!");
     
-        } else if ((isBoss && chance < 0.50) || (!isBoss && chance < 0.20)) {
+        } else if ((isBoss && chance < 0.50) || (!isBoss && chance < 0.20)) { // 50% chance to defend // 20% for normal
             monster.setShield(true);
             monsterImgLabel.setIcon(getMonsterIcon("defend"));
             new Timer(1000, e -> {
@@ -272,14 +272,14 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                 dmg += t.dmgPts;
             }
     
-            if (monster.isShieldActive()) {
+            if (monster.isShieldActive()) { // Monster's shield active
                 dmg /= 2;
                 monster.setShield(false);
                 JOptionPane.showMessageDialog(this,
                     String.format("%s's shield halved the damage!", monster.name));
             }
     
-            if (shieldActive) {
+            if (shieldActive) { // Player's shield active
                 dmg /= 2;
                 shieldActive = false;
                 JOptionPane.showMessageDialog(this,
@@ -303,14 +303,14 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         }
     }
 
-    private void clearSelection() {
+    private void clearSelection() { // Clear the selected letters and reset the UI
         for (JButton b: selectedBtn) b.setBackground(null);
         selectedBtn.clear();
         selectedPos.clear();
         wordLabel.setText("Current: ");
     }
 
-    private void refreshGrid() {
+    private void refreshGrid() { // Refresh the grid UI after changes
         for (int r=0; r<GRID_SIZE; r++) {
             for (int c=0; c<GRID_SIZE; c++) {
                 Tile t = gridModel.getTile(r,c);
@@ -321,14 +321,14 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         }
     }
 
-    private void nextLevel() {
+    private void nextLevel() { // Move to the next level and refresh the game state
         currentLevel++;
         if (currentLevel > MAX_LEVEL) {
             JOptionPane.showMessageDialog(this, "You WIN! 🎉");
             System.exit(0);
         }
         monster = createMonsterForLevel(currentLevel);
-        monsterImgLabel.setIcon(getMonsterIcon("idle")); // <––– อัปเดตรูปใหม่ให้ตรงกับมอนสเตอร์ใหม่
+        monsterImgLabel.setIcon(getMonsterIcon("idle"));
         JOptionPane.showMessageDialog(this,
             "Level up! Now facing " + monster.name);
         gridModel = new Grid(GRID_SIZE);
@@ -337,7 +337,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         updateStatusLabels();
     }
 
-    private void openShop() {
+    private void openShop() { // Open the shop to buy items
         String[] options = {
             "Heal (5 Gems)",
             "Shield (3 Gems)",
@@ -382,14 +382,14 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                         JOptionPane.showMessageDialog(this, "Not enough Gems");
                     }
                     break;
-                case 2:
+                case 2: // Buff Attack
                     if (totalGems>=4) {
                         totalGems -= 4;
                         player.buffAttack += 10;
                         JOptionPane.showMessageDialog(this, "Attack +10 next!");
                     } else JOptionPane.showMessageDialog(this, "Not enough Gems");
                     break;
-                case 3:
+                case 3: // Shuffle
                     if (totalGems>=6) {
                         totalGems -= 6;
                         gridModel.shuffle();
@@ -403,7 +403,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         }
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) { // Main method to run the game
         SwingUtilities.invokeLater(BookwormUI::new);
     }
 }

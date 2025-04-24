@@ -14,6 +14,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     private static final int HP_INCREMENT = 4;
     private static final double ATTACK_MULTIPLIER = 1.25;
     private static final int ATTACK_CAP = 40;
+    private int gemMultiplier = 1; 
     private final Random rand = new Random();
 
     private Grid gridModel;
@@ -26,16 +27,26 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     private Entity monster;
     private int currentLevel = 1;
     private int totaldmgPts = 0;
-    private int totalGems = 0;
+    private int totalGems = 99990;
     private boolean shieldActive = false;
 
     private JLabel wordLabel, dmgPtLabel, gemLabel;
     private JLabel playerHpLabel, monsterHpLabel;
     private JLabel playerImgLabel, monsterImgLabel;
 
+    private JLabel damageLabel;
+    private JLabel armorLabel;
+    private JLabel manaLabel;
+
     private Map<String, ImageIcon> icons = new HashMap<>();
     protected JPanel gridPanel;
     private enum Reaction { HEAL, DEFEND, COUNTER }
+
+    private Set<String> purchasedItems = new HashSet<>();
+    private int holyWaterCount = 0;
+    private boolean hasNecklace = false;    
+    private boolean hasSake = false;    
+    private boolean hasHolywater = false;    
 
 
     public BookwormUI() {
@@ -130,9 +141,15 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         gemLabel = new JLabel("Gems: 0");
         gemLabel.setFont(gemLabel.getFont().deriveFont(Font.BOLD,14f));
         gemLabel.setForeground(new Color(128,0,128));
+        damageLabel = new JLabel();
+        armorLabel  = new JLabel();
+        manaLabel   = new JLabel();
         status.add(playerHpLabel);
-        status.add(monsterHpLabel);
+        status.add(damageLabel);
         status.add(dmgPtLabel);
+        status.add(monsterHpLabel);
+        status.add(manaLabel);
+        status.add(armorLabel);
         status.add(gemLabel);
         playerImgLabel = new JLabel(icons.get("hero_idle"));
         monsterImgLabel = new JLabel(getMonsterIcon("idle"));
@@ -194,10 +211,180 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         return icons.get(keyBase+"_"+state);
     }
 
+    private void handleAfterBoss() {
+        // 1. ถามว่าจะเปิดกล่องรางวัลหรือไม่
+        int open = JOptionPane.showConfirmDialog(
+            this,
+            "You found Loot Box Do you want to open it?",
+            "Loot Box",
+            JOptionPane.YES_NO_OPTION
+        );
+        if (open == JOptionPane.YES_OPTION) {
+            openLootBox();
+        }
+    
+        // 2. ตรวจสอบโอกาสเกิดพ่อค้าลับ
+        if (shouldSpawnMerchant()) {
+            openSecretMerchant();
+        }
+    }
+
+    private boolean shouldSpawnMerchant() {
+        // ด่าน 10 กับ 15 เกิดแน่นอน
+        if (currentLevel == 10 || currentLevel == 15) {
+            return true;
+        }
+        // ด่านอื่น ๆ ให้โอกาสเกิด 50%
+        return rand.nextDouble() < 0.50;
+    }
+
+    private void openSecretMerchant() {
+        // ซ่อนกริด
+        remove(gridPanel);
+        // เตรียม merchant panel
+        JPanel merchantPanel = new JPanel(new BorderLayout(10,10));
+        // รายการสินค้า
+        String[] options = {
+            "Weapon of Hero (100 Gems)",
+            "Armor of Hero (100 Gems)",
+            "Rainbow Potion (50 Gems)",
+            "Red Potion (80 Gems)",
+            "Necklace: Remove Debuff (80 Gems)",
+            "Holy Water (120 Gems)",
+            "Sake (30 Gems)",
+            "Quit Shop",
+        };
+        JPanel buttonPanel = new JPanel(new GridLayout(options.length,1,5,5));
+        // แสดงปุ่มแต่ละสินค้า
+        for (String opt : options) {
+            JButton b = new JButton(opt);
+            // ถ้าเคยซื้อแล้ว ยกเลิกการสร้างปุ่มสำหรับรายการถาวร
+            if (purchasedItems.contains(opt) && !opt.startsWith("Holy Water")) continue;
+            b.addActionListener(e -> {
+                if (opt.equals("Quit Shop")) {
+                    // คืนกริดเดิม และไปด่านถัดไป
+                    remove(merchantPanel);
+                    add(gridPanel, BorderLayout.CENTER);
+                    nextLevel(gridPanel);
+                    validate(); repaint();
+                    return;
+                }
+                int cost = Integer.parseInt(
+                    opt.replaceAll(".*\\((\\d+) Gems\\)", "$1")
+                );                if (totalGems < cost) {
+                    JOptionPane.showMessageDialog(this, "Not enough gems");
+                    return;
+                }
+                totalGems -= cost;
+                // จัดการซื้อ
+                switch(opt) {
+                    case "Weapon of Hero (100 Gems)":
+                        player.baseDamage += 64;
+                        JOptionPane.showMessageDialog(this, "Buy Weapon of Hero: +64 ATK");
+                        break;
+                    case "Armor of Hero (100 Gems)":
+                        player.armor += 50;
+                        JOptionPane.showMessageDialog(this, "Buy Armor of Hero: +50 Armor");
+                        break;
+                    case "Rainbow Potion (50 Gems)":
+                        gemMultiplier = 2;
+                        JOptionPane.showMessageDialog(this,"Rainbow Potion: Gain Gems x2");
+                        break;
+                    case "Red Potion (80 Gems)":
+                        player.maxHp += 100; player.hp += 100;
+                        player.maxMana += 50; player.mana += 50;
+                        JOptionPane.showMessageDialog(this, "Red Potion: MaxHP +100, Max Mana +50, Hp +100, Mana +50");
+                        break;
+                    case "Necklace: Remove Debuff (80 Gems)":
+                        hasNecklace = true;
+                        JOptionPane.showMessageDialog(this, "Remove debuffs");
+                        break;
+                    case "Holy Water (120 Gems)":
+                        hasHolywater = true;
+                        holyWaterCount++;
+                        JOptionPane.showMessageDialog(this, "Holy Water?");
+                        break;
+                    case "Sake (30 Gems)":
+                        hasSake = true;
+                        JOptionPane.showMessageDialog(this, "Sake?");
+                        break;
+                }
+                updateStatusLabels();
+                // ถ้าเป็นสินค้าถาวร (ไม่ใช่ Holy Water) ให้ลบปุ่มทิ้ง
+                if (!opt.equals("Holy Water (120 Gems)")) {
+                    buttonPanel.remove(b);
+                    purchasedItems.add(opt);
+                    buttonPanel.revalidate(); buttonPanel.repaint();
+                }
+            });
+            buttonPanel.add(b);
+        }
+        merchantPanel.add(buttonPanel, BorderLayout.CENTER);
+        // 2. ขวา: รูปพ่อค้า
+        ImageIcon merchantIcon = new ImageIcon(getClass().getResource("./images/secret_merchant.png"));
+        JLabel merchantImg = new JLabel(merchantIcon);
+        merchantPanel.add(merchantImg, BorderLayout.EAST);
+        // แสดง
+        add(merchantPanel, BorderLayout.CENTER);
+        validate(); repaint();
+    }
+
+    private void openLootBox() {
+        int roll = rand.nextInt(100);
+    
+        if (roll < 20) { // 20% ดาบเพิ่ม Base Damage +20% ถึง +40%
+            int percent = 20 + rand.nextInt(21);
+            player.baseDamage = (int)(player.baseDamage * (1 + percent / 100.0));
+            JOptionPane.showMessageDialog(this, "Sword Buff: Base ATK +" + percent + "%");
+    
+        } else if (roll < 35) { // 15% ดีบัฟลด Base Damage –20% ถึง –30%
+            int percent = 20 + rand.nextInt(11);
+            player.baseDamage = (int)(player.baseDamage * (1 - percent / 100.0));
+            JOptionPane.showMessageDialog(this, "Debuff: Base ATK –" + percent + "%");
+    
+        } else if (roll < 50) { // 15% Max HP +50
+            player.maxHp += 50;
+            player.hp = Math.min(player.hp + 50, player.maxHp);
+            JOptionPane.showMessageDialog(this, "Max HP +50");
+    
+        } else if (roll < 60) { // 10% Max HP -10
+            player.maxHp = Math.max(1, player.maxHp - 10);
+            player.hp = Math.min(player.hp, player.maxHp);
+            JOptionPane.showMessageDialog(this, "Max HP -10");
+    
+        } else if (roll < 70) { // 10% Armor +5 ถึง +10
+            int amount = 5 + rand.nextInt(6);
+            player.armor += amount;
+            JOptionPane.showMessageDialog(this, "Armor +" + amount);
+    
+        } else if (roll < 80) { // 10% Armor -5 ถึง -10
+            int amount = 5 + rand.nextInt(6);
+            player.armor = Math.max(0, player.armor - amount);
+            JOptionPane.showMessageDialog(this, "Armor -" + amount);
+    
+        } else if (roll < 90) { // 10% Max Mana +20% ถึง +40%
+            int percent = 20 + rand.nextInt(21);
+            player.maxMana = (int)(player.maxMana * (1 + percent / 100.0));
+            player.mana = player.maxMana;
+            JOptionPane.showMessageDialog(this, "Max Mana +" + percent + "%");
+    
+        } else { // 10% Max Mana -20% ถึง -40%
+            int percent = 20 + rand.nextInt(21);
+            player.maxMana = (int)(player.maxMana * (1 - percent / 100.0));
+            player.mana = Math.min(player.mana, player.maxMana);
+            JOptionPane.showMessageDialog(this, "Max Mana –" + percent + "%");
+        }
+    
+        updateStatusLabels();
+    }
+
     private void updateStatusLabels() {
         playerHpLabel.setText(player.name+" HP: "+player.hp+"/"+player.maxHp);
-        monsterHpLabel.setText(monster.name+" HP: "+monster.hp+"/"+monster.maxHp);
+        damageLabel.setText("Base ATK: " + player.baseDamage);
         dmgPtLabel.setText("Damage: "+totaldmgPts);
+        monsterHpLabel.setText(monster.name+" HP: "+monster.hp+"/"+monster.maxHp);
+        manaLabel.setText("Mana: " + player.mana + "/" + player.maxMana);        
+        armorLabel.setText("Armor: " + player.armor);
         gemLabel.setText("Gems: "+totalGems);
     }
 
@@ -288,13 +475,12 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                 JOptionPane.showMessageDialog(this,"Special tile! Damage doubled and board will reset.");
             }
             // สร้าง raw damage โดยบวกบัฟหลังคูณสอง
-            int raw = tileDmg + player.buffAttack;
-            // รีเซ็ตบัฟใช้ครั้งเดียว
+            int raw = player.baseDamage + tileDmg + player.buffAttack;            // รีเซ็ตบัฟใช้ครั้งเดียว
             player.buffAttack = 0;
 
             // เพิ่มสถิติ
             totaldmgPts += tileDmg;
-            totalGems += gainG;
+            totalGems += gainG * gemMultiplier;
 
             // สถานะ monster ตอบโต้
             Reaction react = decideReaction();
@@ -323,9 +509,23 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
             updateStatusLabels();
 
             // ถ้า monster ยังไม่ตาย ให้มันตอบโต้
-            if (monster.hp>0) reactToPlayerAttack(react);
-            else nextLevel(grid);
-        }
+            if (monster.hp > 0) {
+                reactToPlayerAttack(react);
+            } else {
+                // ถ้าเป็นห้องบอส (ด่าน 5,10,15...)
+                if (currentLevel % 5 == 0) {
+                    boolean spawnMerchant = shouldSpawnMerchant();
+                    handleAfterBoss();
+                    // ถ้าไม่มีพ่อค้าลับให้ข้ามไปด่านต่อ
+                    if (!spawnMerchant) {
+                        nextLevel(grid);
+                    }
+                } else {
+                    // ไม่ใช่ห้องบอส ก็ไปด่านต่อเลย
+                    nextLevel(grid);
+                }
+            }
+    }
         clearSelection();
         updateStatusLabels();
     }
@@ -343,7 +543,8 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                 break;
             case DEFEND:
             case COUNTER:
-                int dmg = calculateRandomDamage();
+                int rawDmg = calculateRandomDamage();
+                int dmg = Math.max(1, rawDmg - player.armor);
                 if (shieldActive) { dmg/=2; shieldActive=false; JOptionPane.showMessageDialog(this,"Your shield blocks 50% of the counterattack!"); }
                 player.hp -= dmg;
                 playSound(isBoss?"boss_attack.wav":"enemy_attack.wav");
@@ -357,8 +558,17 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     }
 
     public void clearSelection() {
-        for (JButton b : selectedBtn) b.setBackground(null);
-        selectedBtn.clear(); selectedPos.clear();
+        // ล้างการเลือก และคืนพื้นหลังตามสกิลพิเศษ
+        for (JButton b : selectedBtn) {
+            Position p = (Position)b.getClientProperty("pos");
+            if (gridModel.getTile(p.row, p.col).isSpecial()) {
+                b.setBackground(Color.PINK);
+            } else {
+                b.setBackground(null);
+            }
+        }
+        selectedBtn.clear();
+        selectedPos.clear();
         wordLabel.setText("Current: ");
     }
 

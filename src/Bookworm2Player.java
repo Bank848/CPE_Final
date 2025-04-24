@@ -224,47 +224,60 @@ public class Bookworm2Player extends JFrame {
         playSound("attack.wav");
         String word = wordLabel.getText().substring(9);
         boolean special = selectedPos.stream().anyMatch(p -> gridModel.getTile(p.row,p.col).isSpecial());
-        if (word.length()<3 || !dict.contains(word)) {
+        if (word.length() < 3 || !dict.contains(word)) {
             JOptionPane.showMessageDialog(this, "Invalid word");
         } else {
-            int dmg=0, gems=0;
+            int tileDmg = 0, gems = 0;
             for (Position p : selectedPos) {
-                Tile t = gridModel.getTile(p.row,p.col);
-                dmg += t.getDmgPts();
+                Tile t = gridModel.getTile(p.row, p.col);
+                tileDmg += t.getDmgPts();
                 gems += t.getGemPts();
             }
             if (special) {
-                dmg *= 2;
+                tileDmg *= 2;
                 JOptionPane.showMessageDialog(this, "Special tile! Damage doubled and board will reset.");
             }
+            int dmg = tileDmg + currentPlayer.buffAttack;
+
             // Shield effect
             if (opponent.isShieldActive()) {
                 dmg /= 2;
                 opponent.setShield(false);
                 JOptionPane.showMessageDialog(this, opponent.name + "'s shield blocked half the damage!");
             }
+
             // Apply damage
             opponent.hp -= dmg;
+            // รีเซ็ตบัฟถ้าเป็นบัฟใช้ครั้งเดียว
+            currentPlayer.buffAttack = 0;
+
             // Award gems
             if (currentPlayer == player1) p1Gems += gems; else p2Gems += gems;
             JOptionPane.showMessageDialog(this, currentPlayer.name + " dealt " + dmg + " dmg, +" + gems + " gems");
 
             // Update grid
-            gridModel = special ? new Grid(GRID_SIZE) : gridModel;
-            if (!special) gridModel.removeAndCollapse(selectedPos);
+            if (special) gridModel = new Grid(GRID_SIZE);
+            else gridModel.removeAndCollapse(selectedPos);
             selectedPos.clear(); selectedBtn.clear();
             refreshGrid(gridPanel);
 
             nextTurn();
         }
-        clearSelection(); updateStatus();
+        clearSelection();
+        updateStatus();
     }
 
     private void clearSelection() {
-        for (JButton b : selectedBtn) b.setBackground(null);
+        for (JButton b : selectedBtn) {
+            Position p = (Position) b.getClientProperty("pos");
+            Tile t = gridModel.getTile(p.row, p.col);
+            if (t.isSpecial()) b.setBackground(Color.PINK);
+            else b.setBackground(null);
+        }
         selectedBtn.clear(); selectedPos.clear();
         wordLabel.setText("Current: ");
     }
+
 
     private void openShop(JPanel gridPanel) {
         while (true) {
@@ -329,7 +342,15 @@ public class Bookworm2Player extends JFrame {
                         gemsAvail -= 4;
                         currentPlayer.buffAttack += 10;
                         buffCount++;
-                        playSound("buff.wav");
+                        playSound("buffatk.wav");
+                        // Animate heal
+                        JLabel imgLabel = (currentPlayer == player1 ? p1ImgLabel : p2ImgLabel);
+                        imgLabel.setIcon(icons.get((currentPlayer == player1 ? "p1_heal" : "p2_heal")));
+                        new Timer(1000, e -> {
+                            imgLabel.setIcon(icons.get((currentPlayer == player1 ? "p1_idle" : "p2_idle")));
+                            ((Timer) e.getSource()).stop();
+                        }).start();
+                        JOptionPane.showMessageDialog(this, "Attack buff activated! +10 damage for this round.");              
                     }
                     break;
                 case 3: // Shuffle

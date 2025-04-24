@@ -275,47 +275,59 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
             JOptionPane.showMessageDialog(this,"Word invalid.");
             playerImgLabel.setIcon(icons.get("hero_idle"));
         } else {
-            int gaindmg=0, gainG=0;
+            // แยกคำนวณ damage จาก tile
+            int tileDmg = 0, gainG = 0;
             for (Position p: selectedPos) {
                 Tile t = gridModel.getTile(p.row,p.col);
-                gaindmg += t.getDmgPts(); gainG += t.getGemPts();
+                tileDmg += t.getDmgPts();
+                gainG += t.getGemPts();
             }
-            if (special) { gaindmg *= 2; JOptionPane.showMessageDialog(this,"Special tile! Damage doubled and board will reset."); }
-            totaldmgPts += gaindmg; totalGems += gainG;
+            // ถ้าเป็น special ให้คูณสองเฉพาะ tile damage
+            if (special) {
+                tileDmg *= 2;
+                JOptionPane.showMessageDialog(this,"Special tile! Damage doubled and board will reset.");
+            }
+            // สร้าง raw damage โดยบวกบัฟหลังคูณสอง
+            int raw = tileDmg + player.buffAttack;
+            // รีเซ็ตบัฟใช้ครั้งเดียว
+            player.buffAttack = 0;
 
+            // เพิ่มสถิติ
+            totaldmgPts += tileDmg;
+            totalGems += gainG;
+
+            // สถานะ monster ตอบโต้
             Reaction react = decideReaction();
-            int raw = gaindmg + player.buffAttack;
-
-            // DEFEND reaction: give monster shield to block this hit
+            // ให้เกราะ monster ถ้า reaction เป็น DEFEND
             if (react == Reaction.DEFEND) {
                 monster.setShield(true);
                 playSound((currentLevel%5==0)?"boss_defend.wav":"enemy_defend.wav");
                 monsterImgLabel.setIcon(getMonsterIcon("defend"));
                 new Timer(500,e->{ monsterImgLabel.setIcon(getMonsterIcon("idle")); ((Timer)e.getSource()).stop(); }).start();
             }
-
-            // apply shield if any
+            // ถ้ามี shield ลดครึ่ง
             if (monster.isShieldActive()) {
                 raw /= 2;
                 monster.setShield(false);
                 JOptionPane.showMessageDialog(this, monster.name+" blocks 50% of your damage!");
             }
-
-            // deal damage
+            // ทำ damage ให้ monster
             monster.hp -= raw;
             JOptionPane.showMessageDialog(this,String.format("You dealt %d dmg, +%d Gems", raw, gainG));
             new Timer(1000,e->{ playerImgLabel.setIcon(icons.get("hero_idle")); ((Timer)e.getSource()).stop(); }).start();
 
-            // grid update
+            // อัพเดตกริด
             if (special) gridModel = new Grid(GRID_SIZE);
             else gridModel.removeAndCollapse(selectedPos);
             initGridPanel(grid);
             updateStatusLabels();
 
+            // ถ้า monster ยังไม่ตาย ให้มันตอบโต้
             if (monster.hp>0) reactToPlayerAttack(react);
             else nextLevel(grid);
         }
-        clearSelection(); updateStatusLabels();
+        clearSelection();
+        updateStatusLabels();
     }
 
     private void reactToPlayerAttack(Reaction react) {
@@ -434,6 +446,14 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                     if (totalGems >= 4) {
                         totalGems -= 4;
                         e.buffAttack += 10;
+                        playSound("buffatk.wav");
+                        playerImgLabel.setIcon(icons.get("hero_heal"));
+                        // Revert to idle after animation
+                        new Timer(1000, evt -> {
+                            playerImgLabel.setIcon(icons.get("hero_idle"));
+                            ((Timer) evt.getSource()).stop();
+                        }).start();
+                        JOptionPane.showMessageDialog(this, "Attack buff activated! +10 damage for this round.");
                     } else {
                         JOptionPane.showMessageDialog(this, "Not enough Gems");
                     }

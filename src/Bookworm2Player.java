@@ -19,11 +19,12 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 
 public class Bookworm2Player extends JFrame {
     private static final int GRID_SIZE = 8;
-    private static final int MAX_PURCHASES = 3;
     private static final boolean DEV_MODE = true;
+    private static final int MAX_ITEM_PURCHASES = 3;
 
     private Grid gridModel;
     private FreeDictionary dict;
@@ -35,14 +36,15 @@ public class Bookworm2Player extends JFrame {
     private Entity currentPlayer, opponent;
 
     private int p1Gems, p2Gems;
+    private int healCount, shieldCount, buffCount;
     private JLabel wordLabel;
     private JLabel p1HpLabel, p2HpLabel;
     private JLabel p1GemsLabel, p2GemsLabel;
     private JLabel p1ImgLabel, p2ImgLabel;
     private JLabel roundLabel;
+    private int roundCount = 1;
 
     private Map<String, ImageIcon> icons = new HashMap<>();
-    private int roundCount = 1;
 
     public Bookworm2Player() {
         super("Bookworm 2 Player Mode");
@@ -56,8 +58,14 @@ public class Bookworm2Player extends JFrame {
         currentPlayer = player1;
         opponent = player2;
         p1Gems = p2Gems = 0;
+        resetPurchaseCounts();
         initUI();
         playSound("fight.wav");
+    }
+
+
+    private void resetPurchaseCounts() {
+        healCount = shieldCount = buffCount = 0;
     }
 
     private Entity chooseChampion(int num) {
@@ -146,24 +154,34 @@ public class Bookworm2Player extends JFrame {
     }
 
     private void refreshGrid(JPanel panel) {
+        // Prevent clearing before wordLabel is initialized
+        if (wordLabel != null) clearSelection();
         panel.removeAll();
-        for (int r=0; r<GRID_SIZE; r++) {
-            for (int c=0; c<GRID_SIZE; c++) {
-                Tile t = gridModel.getTile(r,c);
+        for (int r = 0; r < GRID_SIZE; r++) {
+            for (int c = 0; c < GRID_SIZE; c++) {
+                Tile t = gridModel.getTile(r, c);
                 String html = String.format(
                     "<html><center>%c%s<br><font color='black'>%d</font> / <font color='purple'>%d</font></center></html>",
-                    t.letter, t.isSpecial()?"<font color='red'>*</font>":"", t.getDmgPts(), t.getGemPts()
+                    t.letter,
+                    t.isSpecial() ? "<font color='red'>*</font>" : "",
+                    t.getDmgPts(),
+                    t.getGemPts()
                 );
                 JButton b = new JButton(html);
-                if (t.isSpecial()) b.setBackground(Color.PINK);
                 b.setFont(new Font("Monospaced", Font.PLAIN, 16));
-                b.putClientProperty("pos", new Position(r,c));
-                b.addActionListener(e -> onLetterClick((JButton)e.getSource()));
+                if (t.isSpecial()) {
+                    b.setBackground(Color.PINK);
+                } else {
+                    b.setBackground(null);
+                }
+                b.putClientProperty("pos", new Position(r, c));
+                b.addActionListener(e -> onLetterClick((JButton) e.getSource()));
                 buttons[r][c] = b;
                 panel.add(b);
             }
         }
-        panel.revalidate(); panel.repaint();
+        panel.revalidate();
+        panel.repaint();
     }
 
     private void onLetterClick(JButton btn) {
@@ -249,67 +267,84 @@ public class Bookworm2Player extends JFrame {
     }
 
     private void openShop(JPanel gridPanel) {
-        int count = 0;
-        while (count < MAX_PURCHASES) {
-            int gemsAvail = (currentPlayer==player1? p1Gems : p2Gems);
-            int remaining = MAX_PURCHASES - count;
-            String[] opts = {"Heal (5)","Shield (3)","BuffAtk (4)","Shuffle (6)","Close"};
-            String msg = "Gems: " + gemsAvail + "\nPurchases left: " + remaining + "\nSelect Item to buy";
+        while (true) {
+            int gemsAvail = (currentPlayer == player1 ? p1Gems : p2Gems);
+            String[] opts = {"Heal (5)", "Shield (3)", "BuffAtk (4)", "Shuffle (6)", "Close"};
+            String msg = String.format(
+                "Gems: %d\nHeal: %d/%d, Shield: %d/%d, Buff: %d/%d\nSelect Item to buy (Shuffle unlimited)",
+                gemsAvail, healCount, MAX_ITEM_PURCHASES, shieldCount, MAX_ITEM_PURCHASES, buffCount, MAX_ITEM_PURCHASES
+            );
             int choice = JOptionPane.showOptionDialog(
-                this,
-                msg,
-                currentPlayer.name + " Shop",
-                JOptionPane.DEFAULT_OPTION,
-                JOptionPane.PLAIN_MESSAGE,
+                this, msg, currentPlayer.name + " Shop",
+                JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE,
                 null, opts, opts[0]
             );
             if (choice < 0 || choice == 4) break;
             switch (choice) {
                 case 0: // Heal
-                    if (gemsAvail >= 5) {
-                        currentPlayer.hp = Math.min(currentPlayer.maxHp, currentPlayer.hp+20);
-                        gemsAvail -= 5;
-                        playSound("heal.wav");
-                    } else {
+                    if (healCount >= MAX_ITEM_PURCHASES) {
+                        JOptionPane.showMessageDialog(this, "Max heal purchases reached this round.");
+                    } else if (gemsAvail < 5) {
                         JOptionPane.showMessageDialog(this, "Not enough Gems");
+                    } else {
+                        gemsAvail -= 5;
+                        currentPlayer.hp = Math.min(currentPlayer.maxHp, currentPlayer.hp + 20);
+                        healCount++;
+                        playSound("heal.wav");
+                        // Animate heal
+                        JLabel imgLabel = (currentPlayer == player1 ? p1ImgLabel : p2ImgLabel);
+                        imgLabel.setIcon(icons.get((currentPlayer == player1 ? "p1_heal" : "p2_heal")));
+                        new Timer(1000, e -> {
+                            imgLabel.setIcon(icons.get((currentPlayer == player1 ? "p1_idle" : "p2_idle")));
+                            ((Timer) e.getSource()).stop();
+                        }).start();
                     }
                     break;
                 case 1: // Shield
-                    if (gemsAvail >= 3) {
-                        currentPlayer.setShield(true);
-                        gemsAvail -= 3;
-                        playSound("defend.wav");
-                        JOptionPane.showMessageDialog(this, "Shield activated! Next incoming damage will be halved.");
-                    } else {
+                    if (shieldCount >= MAX_ITEM_PURCHASES) {
+                        JOptionPane.showMessageDialog(this, "Max shield purchases reached this round.");
+                    } else if (gemsAvail < 3) {
                         JOptionPane.showMessageDialog(this, "Not enough Gems");
+                    } else {
+                        gemsAvail -= 3;
+                        currentPlayer.setShield(true);
+                        shieldCount++;
+                        playSound("defend.wav");
+                        JOptionPane.showMessageDialog(this, "Shield activated! Next incoming damage halved.");
+                        // Animate defend
+                        JLabel imgLabel2 = (currentPlayer == player1 ? p1ImgLabel : p2ImgLabel);
+                        imgLabel2.setIcon(icons.get((currentPlayer == player1 ? "p1_defend" : "p2_defend")));
+                        new Timer(1000, e -> {
+                            imgLabel2.setIcon(icons.get((currentPlayer == player1 ? "p1_idle" : "p2_idle")));
+                            ((Timer) e.getSource()).stop();
+                        }).start();
                     }
                     break;
                 case 2: // BuffAtk
-                    if (gemsAvail >= 4) {
-                        currentPlayer.buffAttack += 10;
-                        gemsAvail -= 4;
-                    } else {
+                    if (buffCount >= MAX_ITEM_PURCHASES) {
+                        JOptionPane.showMessageDialog(this, "Max buff purchases reached this round.");
+                    } else if (gemsAvail < 4) {
                         JOptionPane.showMessageDialog(this, "Not enough Gems");
+                    } else {
+                        gemsAvail -= 4;
+                        currentPlayer.buffAttack += 10;
+                        buffCount++;
+                        playSound("buff.wav");
                     }
                     break;
                 case 3: // Shuffle
-                    if (gemsAvail >= 6) {
+                    if (gemsAvail < 6) {
+                        JOptionPane.showMessageDialog(this, "Not enough Gems");
+                    } else {
+                        gemsAvail -= 6;
                         gridModel.shuffle();
                         refreshGrid(gridPanel);
-                        gemsAvail -= 6;
                         playSound("shuffle.wav");
-                    } else {
-                        JOptionPane.showMessageDialog(this, "Not enough Gems");
                     }
                     break;
             }
-            // Update gem count
             if (currentPlayer == player1) p1Gems = gemsAvail; else p2Gems = gemsAvail;
-            count++;
             updateStatus();
-        }
-        if (count >= MAX_PURCHASES) {
-            JOptionPane.showMessageDialog(this, "You have used all your purchases this turn.");
         }
     }
 
@@ -320,10 +355,11 @@ public class Bookworm2Player extends JFrame {
             playSound("gameover.wav");
             System.exit(0);
         }
-        // swap
+        // swap players
         Entity tmp = currentPlayer; currentPlayer = opponent; opponent = tmp;
         roundCount++;
         roundLabel.setText("Round: " + roundCount);
+        resetPurchaseCounts();
         playSound("round" + roundCount + ".wav");
     }
 

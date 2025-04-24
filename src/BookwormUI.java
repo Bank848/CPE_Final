@@ -351,10 +351,25 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     }
 
     private void refreshGrid() {
-        for (int r=0; r<GRID_SIZE; r++) for (int c=0; c<GRID_SIZE; c++) {
-            Tile t = gridModel.getTile(r,c);
-            buttons[r][c].setText(String.format("<html><center>%c<br><font color='black'>%d</font> / <font color='purple'>%d</font></center></html>",
-                t.letter, t.getDmgPts(), t.getGemPts()));
+        for (int r = 0; r < GRID_SIZE; r++) {
+            for (int c = 0; c < GRID_SIZE; c++) {
+                Tile t = gridModel.getTile(r, c);
+                // สร้าง HTML เหมือน initGridPanel
+                String html = String.format(
+                    "<html><center>%c%s<br><font color='black'>%d</font> / <font color='purple'>%d</font></center></html>",
+                    t.letter,
+                    t.isSpecial() ? "<font color='red'>*</font>" : "",
+                    t.getDmgPts(),
+                    t.getGemPts()
+                );
+                buttons[r][c].setText(html);
+                // เปลี่ยน background ถ้าเป็น special
+                if (t.isSpecial()) {
+                    buttons[r][c].setBackground(Color.PINK);
+                } else {
+                    buttons[r][c].setBackground(null);
+                }
+            }
         }
     }
 
@@ -372,14 +387,67 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     public void openShopForPlayer(Entity e) {
         String[] opts = {"Heal (5 Gems)","Shield (3 Gems)","BuffAtk (4 Gems)","Shuffle (6 Gems)","Close"};
         while (true) {
-            int c = JOptionPane.showOptionDialog(this,"Gems: "+totalGems+"\nSelect Item to buy","Shop",
-                JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE,null,opts,opts[0]);
-            if (c<0||c==opts.length-1) break;
-            switch(c) {
-                case 0: if (totalGems>=5){ totalGems-=5; e.hp=Math.min(e.maxHp,e.hp+20); playSound("heal.wav"); } else JOptionPane.showMessageDialog(this,"Not enough Gems"); break;
-                case 1: if (totalGems>=3){ totalGems-=3; shieldActive=true; playSound("defend.wav"); } else JOptionPane.showMessageDialog(this,"Not enough Gems"); break;
-                case 2: if (totalGems>=4){ totalGems-=4; e.buffAttack+=10; } else JOptionPane.showMessageDialog(this,"Not enough Gems"); break;
-                case 3: if (totalGems>=6){ totalGems-=6; gridModel.shuffle(); refreshGrid(); clearSelection(); } else JOptionPane.showMessageDialog(this,"Not enough Gems"); break;
+            int c = JOptionPane.showOptionDialog(this,
+                    "Gems: " + totalGems + "\nSelect Item to buy",
+                    "Shop",
+                    JOptionPane.DEFAULT_OPTION,
+                    JOptionPane.PLAIN_MESSAGE,
+                    null,
+                    opts,
+                    opts[0]
+            );
+            if (c < 0 || c == opts.length - 1) break;
+            switch (c) {
+                case 0: // Heal
+                    if (totalGems >= 5) {
+                        totalGems -= 5;
+                        e.hp = Math.min(e.maxHp, e.hp + 20);
+                        playSound("heal.wav");
+                        // Change hero image to heal
+                        playerImgLabel.setIcon(icons.get("hero_heal"));
+                        // Revert to idle after animation
+                        new Timer(1000, evt -> {
+                            playerImgLabel.setIcon(icons.get("hero_idle"));
+                            ((Timer) evt.getSource()).stop();
+                        }).start();
+                    } else {
+                        JOptionPane.showMessageDialog(this, "Not enough Gems");
+                    }
+                    break;
+                case 1: // Shield
+                    if (totalGems >= 3) {
+                        totalGems -= 3;
+                        shieldActive = true;
+                        playSound("defend.wav");
+                        // Change hero image to defend (shield)
+                        playerImgLabel.setIcon(icons.get("hero_defend"));
+                        // Revert to idle after animation
+                        new Timer(1000, evt -> {
+                            playerImgLabel.setIcon(icons.get("hero_idle"));
+                            ((Timer) evt.getSource()).stop();
+                        }).start();
+                    } else {
+                        JOptionPane.showMessageDialog(this, "Not enough Gems");
+                    }
+                    break;
+                case 2: // BuffAtk
+                    if (totalGems >= 4) {
+                        totalGems -= 4;
+                        e.buffAttack += 10;
+                    } else {
+                        JOptionPane.showMessageDialog(this, "Not enough Gems");
+                    }
+                    break;
+                case 3: // Shuffle
+                    if (totalGems >= 6) {
+                        totalGems -= 6;
+                        gridModel.shuffle();
+                        refreshGrid();
+                        clearSelection();
+                    } else {
+                        JOptionPane.showMessageDialog(this, "Not enough Gems");
+                    }
+                    break;
             }
         }
         updateStatusLabels();

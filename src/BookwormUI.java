@@ -37,6 +37,9 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     private JLabel damageLabel;
     private JLabel armorLabel;
     private JLabel manaLabel;
+    private JLabel kitsuneHpLabel;
+    private JLabel kitsuneImgLabel;
+    private JLabel monsterLevelLabel;
 
     private Map<String, ImageIcon> icons = new HashMap<>();
     protected JPanel gridPanel;
@@ -47,6 +50,11 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     private boolean hasNecklace = false;    
     private boolean hasSake = false;    
     private boolean hasHolywater = false;    
+    private Entity kitsune = null;
+    private boolean kitsuneBuffActive = false;
+    private JLabel kitsuneDmgLabel;
+    private JLabel kitsuneManaLabel;
+    private boolean kitsuneShieldActive = false;
 
 
     public BookwormUI() {
@@ -131,35 +139,63 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
 
     private void initUI() {
         setLayout(new BorderLayout(5,5));
+    
+        // === TOP BAR ===
         JPanel top = new JPanel(new BorderLayout(10,10));
         top.setBorder(BorderFactory.createEmptyBorder(10,10,10,10));
-        JPanel status = new JPanel(new GridLayout(2,2,5,5));
-        status.setBorder(BorderFactory.createTitledBorder("Status"));
-        playerHpLabel = new JLabel();
-        monsterHpLabel = new JLabel();
-        dmgPtLabel = new JLabel("Damage: 0");
-        gemLabel = new JLabel("Gems: 0");
-        gemLabel.setFont(gemLabel.getFont().deriveFont(Font.BOLD,14f));
-        gemLabel.setForeground(new Color(128,0,128));
-        damageLabel = new JLabel();
-        armorLabel  = new JLabel();
-        manaLabel   = new JLabel();
-        status.add(playerHpLabel);
-        status.add(damageLabel);
-        status.add(dmgPtLabel);
-        status.add(monsterHpLabel);
-        status.add(manaLabel);
-        status.add(armorLabel);
-        status.add(gemLabel);
+    
+        // 1) HERO PANEL (West)
+        JPanel heroPanel = new JPanel(new BorderLayout(5,5));
+        heroPanel.setBorder(BorderFactory.createTitledBorder("Hero"));
         playerImgLabel = new JLabel(icons.get("hero_idle"));
+        heroPanel.add(playerImgLabel, BorderLayout.WEST);
+        JPanel heroStats = new JPanel(new GridLayout(4,1));
+        playerHpLabel    = new JLabel();
+        damageLabel      = new JLabel();
+        manaLabel        = new JLabel();
+        armorLabel       = new JLabel();
+        heroStats.add(playerHpLabel);
+        heroStats.add(damageLabel);
+        heroStats.add(manaLabel);
+        heroStats.add(armorLabel);
+        heroPanel.add(heroStats, BorderLayout.CENTER);
+        top.add(heroPanel, BorderLayout.WEST);
+    
+        // 2) KITSUNE PANEL (Center) - only shown once joined
+        JPanel kitsunePanel = new JPanel(new BorderLayout(5,5));
+        kitsunePanel.setBorder(BorderFactory.createTitledBorder("Ally"));
+        kitsuneImgLabel = new JLabel();      // empty until join
+        kitsunePanel.add(kitsuneImgLabel, BorderLayout.WEST);
+        JPanel kitsuneStats = new JPanel(new GridLayout(3,1));
+        kitsuneHpLabel = new JLabel();
+        kitsuneDmgLabel = new JLabel();
+        kitsuneManaLabel = new JLabel();
+        kitsuneStats.add(kitsuneHpLabel);
+        kitsuneStats.add(kitsuneDmgLabel);
+        kitsuneStats.add(kitsuneManaLabel);
+        kitsunePanel.add(kitsuneStats, BorderLayout.CENTER);
+        top.add(kitsunePanel, BorderLayout.CENTER);
+    
+        // 3) MONSTER PANEL (East)
+        JPanel monsterPanel = new JPanel(new BorderLayout(5,5));
+        monsterPanel.setBorder(BorderFactory.createTitledBorder("Enemy"));
         monsterImgLabel = new JLabel(getMonsterIcon("idle"));
-        top.add(playerImgLabel, BorderLayout.WEST);
-        top.add(status, BorderLayout.CENTER);
-        top.add(monsterImgLabel, BorderLayout.EAST);
+        monsterPanel.add(monsterImgLabel, BorderLayout.WEST);
+        JPanel monsterStats = new JPanel(new GridLayout(3,1));
+        monsterHpLabel = new JLabel();
+        dmgPtLabel     = new JLabel("Damage: 0");
+        monsterLevelLabel = new JLabel("Level: " + currentLevel);  
+        
+        monsterStats.add(monsterHpLabel);
+        monsterStats.add(dmgPtLabel);
+        monsterStats.add(monsterLevelLabel);
+        monsterPanel.add(monsterStats, BorderLayout.CENTER);
+        top.add(monsterPanel, BorderLayout.EAST);
+    
         add(top, BorderLayout.NORTH);
 
-        gridPanel = new JPanel(new GridLayout(GRID_SIZE,GRID_SIZE,2,2));
-        gridPanel.setBorder(BorderFactory.createLineBorder(Color.DARK_GRAY,2));
+        gridPanel = new JPanel(new GridLayout(GRID_SIZE, GRID_SIZE, 2, 2));
+        gridPanel.setBorder(BorderFactory.createLineBorder(Color.DARK_GRAY, 2));
         buttons = new JButton[GRID_SIZE][GRID_SIZE];
         initGridPanel(gridPanel);
         add(gridPanel, BorderLayout.CENTER);
@@ -167,6 +203,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         JPanel control = new JPanel(new FlowLayout(FlowLayout.CENTER,10,10));
         control.setBorder(BorderFactory.createTitledBorder("Controls"));
         wordLabel = new JLabel("Current: ");
+        gemLabel  = new JLabel("Gems: " + totalGems);
         JButton submitBtn = new JButton("Submit");
         JButton clearBtn = new JButton("Clear");
         JButton shopBtn = new JButton("Shop");
@@ -177,14 +214,16 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         control.add(submitBtn);
         control.add(clearBtn);
         control.add(shopBtn);
+        control.add(gemLabel);
         if (DEV_MODE) {
             JButton skipBtn = new JButton("Skip Level");
             skipBtn.addActionListener(e -> nextLevel(gridPanel));
             control.add(skipBtn);
         }
         add(control, BorderLayout.SOUTH);
+
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(820,840);
+        setSize(820, 840);
         setLocationRelativeTo(null);
         setVisible(true);
     }
@@ -283,8 +322,8 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                         JOptionPane.showMessageDialog(this, "Buy Weapon of Hero: +64 ATK");
                         break;
                     case "Armor of Hero (100 Gems)":
-                        player.armor += 50;
-                        JOptionPane.showMessageDialog(this, "Buy Armor of Hero: +50 Armor");
+                        player.armor += 20;
+                        JOptionPane.showMessageDialog(this, "Buy Armor of Hero: +20 Armor");
                         break;
                     case "Rainbow Potion (50 Gems)":
                         gemMultiplier = 2;
@@ -378,14 +417,83 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         updateStatusLabels();
     }
 
+    private void openKitsuneEvent(JPanel grid) {
+        remove(gridPanel);
+        JPanel eventPanel = new JPanel(new BorderLayout(10,10));
+    
+        // ปุ่มเลือก
+        String[] opts = {"Help Kitsune", "Not Help"};
+        JPanel btns = new JPanel(new GridLayout(opts.length,1,5,5));
+        for(String opt: opts) {
+            JButton b = new JButton(opt);
+            b.addActionListener(e -> {
+                if (opt.equals("Help Kitsune")) {
+                    if (hasSake && hasHolywater) {
+                        hasSake = false;
+                        holyWaterCount -= 1;
+                        kitsune = new Entity("Kitsune", 200);
+                        kitsune.baseDamage = 30;
+                        kitsune.armor = 10;
+                        kitsune.maxMana = 100;
+                        kitsune.mana = 100;
+                        kitsuneBuffActive = true;  // จะใช้ในด่าน 20
+                        player.baseDamage -= 550;
+                        JOptionPane.showMessageDialog(this, "Kitsune Join your team!");
+                    } else {
+                        JOptionPane.showMessageDialog(this, "Kitsune: need Sake and Holy Water for healing!");
+                    }
+                }
+                // กลับสู่หน้าบอร์ด
+                remove(eventPanel);
+                add(gridPanel, BorderLayout.CENTER);
+                nextLevel(grid);
+                validate(); 
+                repaint();
+            });
+            btns.add(b);
+        }
+        eventPanel.add(btns, BorderLayout.CENTER);
+    
+        // รูป Kitsune ด้านขวา
+        ImageIcon ik = new ImageIcon(getClass().getResource("./images/kitsune.png"));
+        eventPanel.add(new JLabel(ik), BorderLayout.EAST);
+    
+        add(eventPanel, BorderLayout.CENTER);
+        validate(); repaint();
+    }
+
     private void updateStatusLabels() {
-        playerHpLabel.setText(player.name+" HP: "+player.hp+"/"+player.maxHp);
-        damageLabel.setText("Base ATK: " + player.baseDamage);
-        dmgPtLabel.setText("Damage: "+totaldmgPts);
-        monsterHpLabel.setText(monster.name+" HP: "+monster.hp+"/"+monster.maxHp);
-        manaLabel.setText("Mana: " + player.mana + "/" + player.maxMana);        
-        armorLabel.setText("Armor: " + player.armor);
-        gemLabel.setText("Gems: "+totalGems);
+        // Hero
+        playerHpLabel.setText( String.format("HP: %d / %d", player.hp, player.maxHp) );
+        damageLabel.setText( String.format("ATK: %d", player.baseDamage) );
+        manaLabel.setText(   String.format("Mana: %d / %d", player.mana, player.maxMana) );
+        armorLabel.setText(  String.format("Armor: %d", player.armor) );
+    
+        // Kitsune (only if joined)
+        if (kitsune != null) {
+            kitsuneHpLabel.setText( String.format("HP: %d / %d", kitsune.hp, kitsune.maxHp) );
+            kitsuneDmgLabel.setText( String.format("ATK: %d", kitsune.baseDamage) );
+            kitsuneManaLabel.setText( String.format("Mana: %d / %d", kitsune.mana, kitsune.maxMana) );
+            kitsuneImgLabel.setIcon(new ImageIcon(
+                getClass().getResource("./images/kitsune_idle.png")
+            ));
+        } else {
+            kitsuneHpLabel.setText("");
+            kitsuneDmgLabel.setText("");
+            kitsuneManaLabel.setText("");
+            kitsuneImgLabel.setIcon(null);
+        }
+    
+        // Monster
+        monsterHpLabel.setText( String.format("HP: %d / %d", monster.hp, monster.maxHp) );
+
+        // Level
+        if (monsterLevelLabel != null) {
+            monsterLevelLabel.setText("Level: " + currentLevel);
+        }    
+
+        // Gems
+        gemLabel.setText("Gems: " + totalGems);
     }
 
     private void onLetterClick(JButton btn) {
@@ -489,7 +597,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                 monster.setShield(true);
                 playSound((currentLevel%5==0)?"boss_defend.wav":"enemy_defend.wav");
                 monsterImgLabel.setIcon(getMonsterIcon("defend"));
-                new Timer(500,e->{ monsterImgLabel.setIcon(getMonsterIcon("idle")); ((Timer)e.getSource()).stop(); }).start();
+                new Timer(1000,e->{ monsterImgLabel.setIcon(getMonsterIcon("idle")); ((Timer)e.getSource()).stop(); }).start();
             }
             // ถ้ามี shield ลดครึ่ง
             if (monster.isShieldActive()) {
@@ -512,16 +620,14 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
             if (monster.hp > 0) {
                 reactToPlayerAttack(react);
             } else {
-                // ถ้าเป็นห้องบอส (ด่าน 5,10,15...)
-                if (currentLevel % 5 == 0) {
-                    boolean spawnMerchant = shouldSpawnMerchant();
+                if (currentLevel == 11 && hasSake && hasHolywater) {
+                    // เกิดอีเวนต์ Kitsune
+                    openKitsuneEvent(grid);
+                } else if (currentLevel % 5 == 0) {
+                    boolean spawn = shouldSpawnMerchant();
                     handleAfterBoss();
-                    // ถ้าไม่มีพ่อค้าลับให้ข้ามไปด่านต่อ
-                    if (!spawnMerchant) {
-                        nextLevel(grid);
-                    }
+                    if (!spawn) nextLevel(grid);
                 } else {
-                    // ไม่ใช่ห้องบอส ก็ไปด่านต่อเลย
                     nextLevel(grid);
                 }
             }
@@ -543,10 +649,25 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                 break;
             case DEFEND:
             case COUNTER:
+                if (kitsune != null && react == Reaction.COUNTER && rand.nextDouble() < 0.3) {
+                    monster.hp -= kitsune.baseDamage;
+                    JOptionPane.showMessageDialog(this, "Kitsune COUNTER Attack " + kitsune.baseDamage + " Damage!");
+                }            
                 int rawDmg = calculateRandomDamage();
                 int dmg = Math.max(1, rawDmg - player.armor);
                 if (shieldActive) { dmg/=2; shieldActive=false; JOptionPane.showMessageDialog(this,"Your shield blocks 50% of the counterattack!"); }
                 player.hp -= dmg;
+                // Kitsune โดนด้วยถ้ามี
+                if (kitsune != null) {
+                    int kdmg = dmg;
+                    if (kitsuneShieldActive) {
+                        kdmg /= 2;
+                        kitsuneShieldActive = false;
+                        JOptionPane.showMessageDialog(this, "Kitsune's shield blocks 50% of the attack!");
+                    }
+                    kitsune.hp -= kdmg;
+                    if (kitsune.hp < 0) kitsune.hp = 0;
+                }                
                 playSound(isBoss?"boss_attack.wav":"enemy_attack.wav");
                 monsterImgLabel.setIcon(getMonsterIcon("attack"));
                 new Timer(1000,e->{ monsterImgLabel.setIcon(getMonsterIcon("idle")); ((Timer)e.getSource()).stop(); }).start();
@@ -624,6 +745,9 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                     if (totalGems >= 5) {
                         totalGems -= 5;
                         e.hp = Math.min(e.maxHp, e.hp + 20);
+                        if (kitsune != null) {
+                            kitsune.hp = Math.min(kitsune.maxHp, kitsune.hp + 20);
+                        }                        
                         playSound("heal.wav");
                         // Change hero image to heal
                         playerImgLabel.setIcon(icons.get("hero_heal"));
@@ -640,6 +764,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                     if (totalGems >= 3) {
                         totalGems -= 3;
                         shieldActive = true;
+                        if (kitsune != null) kitsuneShieldActive = true;
                         playSound("defend.wav");
                         // Change hero image to defend (shield)
                         playerImgLabel.setIcon(icons.get("hero_defend"));

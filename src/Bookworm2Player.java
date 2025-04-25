@@ -1,5 +1,6 @@
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridLayout;
@@ -14,13 +15,15 @@ import javax.sound.sampled.Clip;
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
+import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
-
+import javax.swing.UIManager;
+import javax.swing.border.TitledBorder;
 public class Bookworm2Player extends JFrame {
     private static final int GRID_SIZE = 8;
     private static final boolean DEV_MODE = true;
@@ -48,6 +51,16 @@ public class Bookworm2Player extends JFrame {
 
     public Bookworm2Player() {
         super("Bookworm 2 Player Mode");
+        setUndecorated(true);
+        JDialog.setDefaultLookAndFeelDecorated(true);
+        Font dialogFont  = new Font("SansSerif", Font.BOLD, 24);
+        Font dialogTitle = dialogFont.deriveFont(28f);
+        UIManager.put("OptionPane.messageFont", dialogFont);
+        UIManager.put("OptionPane.buttonFont",  dialogFont);
+        UIManager.put("OptionPane.font",        dialogFont);
+        UIManager.put("Dialog.titleFont",       dialogTitle);
+        UIManager.put("OptionPane.titleFont",   dialogTitle);
+
         dict = new FreeDictionary();
         gridModel = new Grid(GRID_SIZE);
         selectedPos = new ArrayList<>();
@@ -103,53 +116,91 @@ public class Bookworm2Player extends JFrame {
     }
 
     private void initUI() {
-        setLayout(new BorderLayout(5,5));
-        JPanel top = new JPanel(new BorderLayout(10,10));
-        top.setBorder(BorderFactory.createEmptyBorder(10,10,10,10));
-
-        // Status & Images
-        JPanel status = new JPanel(new GridLayout(2,2,5,5));
-        status.setBorder(BorderFactory.createTitledBorder("Status"));
-        p1HpLabel = new JLabel(); p2HpLabel = new JLabel();
-        p1GemsLabel = new JLabel(); p2GemsLabel = new JLabel();
-        status.add(p1HpLabel); status.add(p2HpLabel);
-        status.add(p1GemsLabel); status.add(p2GemsLabel);
-
+        // ตั้ง layout หลัก
+        setLayout(new BorderLayout(5, 5));
+    
+        // ฟอนต์มาตรฐานสำหรับ label และ ปุ่ม
+        Font defaultFont = new Font("SansSerif", Font.BOLD, 20);
+        // ฟอนต์สำหรับ title ของ panel
+        Font titleFont   = defaultFont.deriveFont(24f);
+    
+        // === TOP BAR ===
+        JPanel top = new JPanel(new BorderLayout(10, 10));
+        top.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+    
+        // Status Panel
+        JPanel status = new JPanel(new GridLayout(2, 2, 5, 5));
+        TitledBorder statusBorder = BorderFactory.createTitledBorder("Status");
+        statusBorder.setTitleFont(titleFont);
+        status.setBorder(statusBorder);
+    
+        p1HpLabel = new JLabel(); p1HpLabel.setFont(defaultFont);
+        p2HpLabel = new JLabel(); p2HpLabel.setFont(defaultFont);
+        p1GemsLabel = new JLabel(); p1GemsLabel.setFont(defaultFont);
+        p2GemsLabel = new JLabel(); p2GemsLabel.setFont(defaultFont);
+        status.add(p1HpLabel);
+        status.add(p2HpLabel);
+        status.add(p1GemsLabel);
+        status.add(p2GemsLabel);
+    
+        // Hero Images
         p1ImgLabel = new JLabel(icons.get("p1_idle"));
         p2ImgLabel = new JLabel(icons.get("p2_idle"));
         top.add(p1ImgLabel, BorderLayout.WEST);
         top.add(status, BorderLayout.CENTER);
         top.add(p2ImgLabel, BorderLayout.EAST);
+    
         add(top, BorderLayout.NORTH);
-
-        // Grid
-        JPanel gridPanel = new JPanel(new GridLayout(GRID_SIZE, GRID_SIZE,2,2));
-        gridPanel.setBorder(BorderFactory.createLineBorder(Color.DARK_GRAY,2));
+    
+        // === GRID ===
+        JPanel gridPanel = new JPanel(new GridLayout(GRID_SIZE, GRID_SIZE, 2, 2));
+        gridPanel.setBorder(BorderFactory.createLineBorder(Color.DARK_GRAY, 2));
         buttons = new JButton[GRID_SIZE][GRID_SIZE];
         refreshGrid(gridPanel);
         add(gridPanel, BorderLayout.CENTER);
-
-        // Controls
-        JPanel ctrl = new JPanel(new FlowLayout(FlowLayout.CENTER,10,10));
-        ctrl.setBorder(BorderFactory.createTitledBorder("Controls"));
-        wordLabel = new JLabel("Current: ");
+    
+        // === CONTROLS ===
+        JPanel ctrl = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
+        TitledBorder ctrlBorder = BorderFactory.createTitledBorder("Controls");
+        ctrlBorder.setTitleFont(titleFont);
+        ctrl.setBorder(ctrlBorder);
+    
+        wordLabel = new JLabel("Current: "); wordLabel.setFont(defaultFont);
+        roundLabel = new JLabel("Round: " + roundCount); roundLabel.setFont(defaultFont);
+    
         JButton submit = new JButton("Submit");
-        JButton clear = new JButton("Clear");
-        JButton shop = new JButton("Shop");
-        roundLabel = new JLabel("Round: " + roundCount);
-
+        submit.setFont(defaultFont);
+        submit.setPreferredSize(new Dimension(140, 50));
         submit.addActionListener(e -> onSubmit(gridPanel));
+    
+        JButton clear = new JButton("Clear");
+        clear.setFont(defaultFont);
+        clear.setPreferredSize(new Dimension(140, 50));
         clear.addActionListener(e -> clearSelection());
+    
+        JButton shop = new JButton("Shop");
+        shop.setFont(defaultFont);
+        shop.setPreferredSize(new Dimension(140, 50));
         shop.addActionListener(e -> openShop(gridPanel));
-        ctrl.add(wordLabel); ctrl.add(submit);
-        ctrl.add(clear); ctrl.add(shop);
+    
+        ctrl.add(wordLabel);
+        ctrl.add(submit);
+        ctrl.add(clear);
+        ctrl.add(shop);
         ctrl.add(roundLabel);
+    
         add(ctrl, BorderLayout.SOUTH);
-
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(820,840);
-        setLocationRelativeTo(null);
+    
+        // จัดให้พอดีกับคอมโพเนนต์
+        pack();
+    
+        // ขยายให้เต็มหน้าจอ
+        setExtendedState(JFrame.MAXIMIZED_BOTH);
+    
+        // แสดงผล
         setVisible(true);
+    
+        // อัปเดตสถานะ player
         updateStatus();
     }
 
@@ -168,7 +219,7 @@ public class Bookworm2Player extends JFrame {
                     t.getGemPts()
                 );
                 JButton b = new JButton(html);
-                b.setFont(new Font("Monospaced", Font.PLAIN, 16));
+                b.setFont(new Font("Monospaced", Font.PLAIN, 24));
                 if (t.isSpecial()) {
                     b.setBackground(Color.PINK);
                 } else {
@@ -401,16 +452,47 @@ public class Bookworm2Player extends JFrame {
     }
 
     public static void main(String[] args) {
-        String[] modes = {"1 Player","2 Player"};
+        // 1) บังคับ Swing วาด title bar เองก่อน
+        JDialog.setDefaultLookAndFeelDecorated(true);
+    
+        // 2) ตั้งฟอนต์ใหญ่ให้ JOptionPane ทั่วไป
+        Font dialogFont  = new Font("SansSerif", Font.BOLD, 24);
+        Font dialogTitle = dialogFont.deriveFont(28f);
+        UIManager.put("OptionPane.messageFont", dialogFont);
+        UIManager.put("OptionPane.buttonFont",  dialogFont);
+        UIManager.put("OptionPane.font",        dialogFont);
+        UIManager.put("Dialog.titleFont",       dialogTitle);
+        UIManager.put("OptionPane.titleFont",   dialogTitle);
+    
+        // 3) สร้าง dialog เลือกโหมด
+        String[] modes = {"1 Player", "2 Player"};
+        UIManager.put("OptionPane.okButtonText", "OK");
+        UIManager.put("OptionPane.cancelButtonText", "Cancel");
         int m = JOptionPane.showOptionDialog(
             null,
             "Select Game Mode",
             "Bookworm Puzzle RPG",
             JOptionPane.DEFAULT_OPTION,
             JOptionPane.PLAIN_MESSAGE,
-            null, modes, modes[0]
+            null,
+            modes,
+            modes[0]
         );
-        if (m == 1) SwingUtilities.invokeLater(Bookworm2Player::new);
-        else SwingUtilities.invokeLater(BookwormUI::new);
+    
+        // 4) รัน UI ที่ต้องการ
+        if (m == 1) {
+            SwingUtilities.invokeLater(() -> {
+                Bookworm2Player frame = new Bookworm2Player();
+                // เต็มจอจริง
+                frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+                frame.setVisible(true);
+            });
+        } else {
+            SwingUtilities.invokeLater(() -> {
+                BookwormUI frame = new BookwormUI();
+                frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+                frame.setVisible(true);
+            });
+        }
     }
 }

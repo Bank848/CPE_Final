@@ -1,9 +1,11 @@
+//BookwormUI.java
 import java.awt.*;
 import java.util.*; // ใช้ ArrayList, List, Map, HashMap, Queue, LinkedList
 import java.util.List;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
+import javax.sound.sampled.FloatControl;
 import javax.swing.*;
 import javax.swing.Timer;
 
@@ -12,10 +14,9 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     private static final int MAX_LEVEL = 20;
     private static final boolean DEV_MODE = true;
     private static final int HP_INCREMENT = 4;
-    private static final double ATTACK_MULTIPLIER = 1.25;
-    private static final int ATTACK_CAP = 40;
     private int gemMultiplier = 1; 
     private final Random rand = new Random();
+    private float sfxVolume = 1.0f;
 
     private Grid gridModel;
     private FreeDictionary dict;
@@ -30,7 +31,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     private int totalGems = 99990;
     private boolean shieldActive = false;
 
-    private JLabel wordLabel, dmgPtLabel, gemLabel;
+    private JLabel wordLabel, gemLabel;
     private JLabel playerHpLabel, monsterHpLabel;
     private JLabel playerImgLabel, monsterImgLabel;
 
@@ -41,6 +42,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     private JLabel kitsuneImgLabel;
     private JLabel monsterLevelLabel;
 
+    private Set<Position> bannedLetters = new HashSet<>();
     private Map<String, ImageIcon> icons = new HashMap<>();
     protected JPanel gridPanel;
     private enum Reaction { HEAL, DEFEND, COUNTER }
@@ -72,67 +74,163 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
 
     private void loadIcons() {
         String[] states = {"idle","attack","defend","heal"};
+        // Hero
         for (String st: states) {
             icons.put("hero_" + st,
-                new ImageIcon(getClass().getResource("./images/hero_" + st + ".png")));
+                new ImageIcon(getClass().getResource("/images/hero_" + st + ".png")));
         }
+        // Monster & Boss
         for (int lvl = 1; lvl <= MAX_LEVEL; lvl++) {
-            String keyBase = (lvl % 5 == 0) ? "boss" + lvl : "enemy" + lvl;
+            String keyBase;
+            if (lvl % 5 == 0) {
+                // บอสทุก 5 ด่าน
+                switch(lvl) {
+                    case 5:  keyBase = "boss5_highGoblin";   break;
+                    case 10: keyBase = "boss10_kingGoblin";  break;
+                    case 15: keyBase = "boss15_spiderQueen"; break;
+                    case 20: keyBase = "boss20_dragonLord";  break;
+                    default: keyBase = "boss" + lvl;         break;
+                }
+            } else if (lvl >= 11 && lvl <= 14) {
+                keyBase = "enemy_spiderGirl";
+            } else if (lvl >= 16 && lvl <= 19) {
+                keyBase = "enemy_lizardGirl";
+            } else {
+                // ระหว่าง 1–4,6–9 ใช้ generic monster เดียวกัน
+                keyBase = "enemy_basic";
+            }
             for (String st: states) {
                 icons.put(keyBase + "_" + st,
-                    new ImageIcon(getClass().getResource("./images/" + keyBase + "_" + st + ".png")));
+                    new ImageIcon(getClass().getResource("/images/" + keyBase + "_" + st + ".png")));
             }
         }
     }
 
     public void playSound(String soundFileName) {
         try (AudioInputStream audioIn = AudioSystem.getAudioInputStream(
-                getClass().getResource("./sounds/" + soundFileName))) {
+                getClass().getResource("/sounds/" + soundFileName))) {
+
             Clip clip = AudioSystem.getClip();
             clip.open(audioIn);
+
+            // adjust volume if supported
+            if (clip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+                FloatControl gain = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
+                // convert linear 0.0–1.0 into decibels
+                float dB = (float)(20 * Math.log10(sfxVolume <= 0.0f ? 0.0001f : sfxVolume));
+                gain.setValue(dB);
+            }
+
             clip.start();
         } catch (Exception e) {
             if (DEV_MODE) e.printStackTrace();
         }
     }
 
+    private void openOptionsDialog() {
+        // Slider from 0 to 100
+        JSlider slider = new JSlider(0, 100, (int)(sfxVolume * 100));
+        slider.setMajorTickSpacing(25);
+        slider.setMinorTickSpacing(5);
+        slider.setPaintTicks(true);
+        slider.setPaintLabels(true);
+        slider.setBorder(BorderFactory.createTitledBorder("SFX Volume"));
+    
+        int result = JOptionPane.showConfirmDialog(
+            this,
+            slider,
+            "Options",
+            JOptionPane.OK_CANCEL_OPTION,
+            JOptionPane.PLAIN_MESSAGE
+        );
+        if (result == JOptionPane.OK_OPTION) {
+            sfxVolume = slider.getValue() / 100f;
+        }
+    }
+
     private Entity createMonsterForLevel(int lvl) {
         boolean isBoss = (lvl % 5 == 0);
         int baseHp;
+        
         if (isBoss) {
-            Entity prevGoblin = createMonsterForLevel(lvl - 1);
-            baseHp = prevGoblin.maxHp * 2;
+            Entity prev = createMonsterForLevel(lvl - 1);
+            baseHp = prev.maxHp * 2;
         } else if (lvl > 1) {
             Entity prev = createMonsterForLevel(lvl - 1);
-            if ((lvl - 1) % 5 == 0) baseHp = prev.maxHp;
-            else baseHp = prev.maxHp + HP_INCREMENT;
+            baseHp = ((lvl - 1) % 5 == 0) ? prev.maxHp : prev.maxHp + HP_INCREMENT;
         } else {
             baseHp = 40 + lvl * 3;
         }
-        String name = isBoss ? "Boss Lv." + lvl : "Goblin Lv." + lvl;
-        return new Entity(name, baseHp);
+        Entity e = new Entity(
+            isBoss ? "Boss Lv." + lvl : "Monster Lv." + lvl,
+            baseHp
+        );
+
+        e.baseDamage = 5 + lvl * 2;
+
+        return e;
+    }
+
+    private void applyLetterBanIfNeeded() {
+        bannedLetters.clear();
+        // แบนเฉพาะด่านบอส แต่ถ้ามี Necklace ให้ข้าม
+        if (!hasNecklace && (currentLevel == 10 || currentLevel == 15 || currentLevel == 20)) {
+            int total = GRID_SIZE * GRID_SIZE;
+            int banCount = total * (20 + rand.nextInt(11)) / 100; // 20–30%
+            while (bannedLetters.size() < banCount) {
+                int r = rand.nextInt(GRID_SIZE), c = rand.nextInt(GRID_SIZE);
+                bannedLetters.add(new Position(r, c));
+            }
+        }
     }
 
     private void initGridPanel(JPanel panel) {
         panel.removeAll();
+        applyLetterBanIfNeeded();
+    
         for (int r = 0; r < GRID_SIZE; r++) {
             for (int c = 0; c < GRID_SIZE; c++) {
                 Tile t = gridModel.getTile(r, c);
                 JButton btn = new JButton();
+    
+                // สร้างข้อความตัวอักษร + คะแนน
                 String html = String.format(
-                    "<html><center>%c%s<br><font color='black'>%d</font> / <font color='purple'>%d</font></center></html>",
+                    "<html><center>%c%s<br>"
+                    + "<font color='black'>%d</font> / "
+                    + "<font color='purple'>%d</font></center></html>",
                     t.letter,
                     t.isSpecial() ? "<font color='red'>*</font>" : "",
-                    t.getDmgPts(), t.getGemPts());
+                    t.getDmgPts(),
+                    t.getGemPts()
+                );
                 btn.setText(html);
-                if (t.isSpecial()) btn.setBackground(Color.PINK);
                 btn.setFont(new Font("Monospaced", Font.PLAIN, 16));
                 btn.putClientProperty("pos", new Position(r, c));
-                btn.addActionListener(e -> onLetterClick((JButton)e.getSource()));
+    
+                // ถ้าเป็นจุดพิเศษ ติดพื้นหลังชมพู
+                if (t.isSpecial()) {
+                    btn.setBackground(Color.PINK);
+                }
+    
+                // ถ้าตำแหน่งนี้ถูกแบน ให้ปิดการใช้งาน และเปลี่ยนสีฟอนต์เป็นดำ
+                Position pos = new Position(r, c);
+                if (bannedLetters.contains(pos)) {
+                    btn.setEnabled(false);
+                    btn.setForeground(Color.BLACK);
+                } else {
+                    btn.setEnabled(true);
+                }
+    
+                btn.addActionListener(e -> {
+                    if (!btn.isEnabled()) return;  // บล็อกหากถูกแบน
+                    onLetterClick((JButton) e.getSource());
+                });
+    
                 buttons[r][c] = btn;
                 panel.add(btn);
             }
         }
+    
         panel.revalidate();
         panel.repaint();
     }
@@ -151,12 +249,12 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         heroPanel.add(playerImgLabel, BorderLayout.WEST);
         JPanel heroStats = new JPanel(new GridLayout(4,1));
         playerHpLabel    = new JLabel();
+        manaLabel        = new JLabel();        
         damageLabel      = new JLabel();
-        manaLabel        = new JLabel();
         armorLabel       = new JLabel();
         heroStats.add(playerHpLabel);
+        heroStats.add(manaLabel);        
         heroStats.add(damageLabel);
-        heroStats.add(manaLabel);
         heroStats.add(armorLabel);
         heroPanel.add(heroStats, BorderLayout.CENTER);
         top.add(heroPanel, BorderLayout.WEST);
@@ -168,11 +266,11 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         kitsunePanel.add(kitsuneImgLabel, BorderLayout.WEST);
         JPanel kitsuneStats = new JPanel(new GridLayout(3,1));
         kitsuneHpLabel = new JLabel();
-        kitsuneDmgLabel = new JLabel();
         kitsuneManaLabel = new JLabel();
+        kitsuneDmgLabel = new JLabel();
         kitsuneStats.add(kitsuneHpLabel);
+        kitsuneStats.add(kitsuneManaLabel);        
         kitsuneStats.add(kitsuneDmgLabel);
-        kitsuneStats.add(kitsuneManaLabel);
         kitsunePanel.add(kitsuneStats, BorderLayout.CENTER);
         top.add(kitsunePanel, BorderLayout.CENTER);
     
@@ -183,11 +281,9 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         monsterPanel.add(monsterImgLabel, BorderLayout.WEST);
         JPanel monsterStats = new JPanel(new GridLayout(3,1));
         monsterHpLabel = new JLabel();
-        dmgPtLabel     = new JLabel("Damage: 0");
         monsterLevelLabel = new JLabel("Level: " + currentLevel);  
         
         monsterStats.add(monsterHpLabel);
-        monsterStats.add(dmgPtLabel);
         monsterStats.add(monsterLevelLabel);
         monsterPanel.add(monsterStats, BorderLayout.CENTER);
         top.add(monsterPanel, BorderLayout.EAST);
@@ -207,13 +303,16 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         JButton submitBtn = new JButton("Submit");
         JButton clearBtn = new JButton("Clear");
         JButton shopBtn = new JButton("Shop");
+        JButton optionsBtn = new JButton("Options");
         submitBtn.addActionListener(e -> onSubmit(gridPanel));
         clearBtn.addActionListener(e -> clearSelection());
         shopBtn.addActionListener(e -> openShop());
+        optionsBtn.addActionListener(e -> openOptionsDialog());
         control.add(wordLabel);
         control.add(submitBtn);
         control.add(clearBtn);
         control.add(shopBtn);
+        control.add(optionsBtn);
         control.add(gemLabel);
         if (DEV_MODE) {
             JButton skipBtn = new JButton("Skip Level");
@@ -246,11 +345,33 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     }
 
     private ImageIcon getMonsterIcon(String state) {
-        String keyBase = (currentLevel%5==0) ? "boss"+currentLevel : "enemy"+currentLevel;
-        return icons.get(keyBase+"_"+state);
+        String keyBase;
+        if (currentLevel % 5 == 0) {
+            // บอสด่าน 5,10,15,20
+            switch (currentLevel) {
+                case 5:  keyBase = "boss5_highGoblin";   break;
+                case 10: keyBase = "boss10_kingGoblin";  break;
+                case 15: keyBase = "boss15_spiderQueen"; break;
+                case 20: keyBase = "boss20_dragonLord";  break;  // <-- ให้ตรงกับ loadIcons()
+                default: keyBase = "boss" + currentLevel;         break;
+            }
+        } else if (currentLevel >= 11 && currentLevel <= 14) {
+            keyBase = "enemy_spiderGirl";
+        } else if (currentLevel >= 16 && currentLevel <= 19) {
+            keyBase = "enemy_lizardGirl";
+        } else {
+            // ด่าน 1–4 และ 6–9
+            keyBase = "enemy_basic";
+        }
+    
+        // ถ้าไม่มี ก็ fallback ให้ดูอย่างน้อยเจอ generic
+        return icons.getOrDefault(
+            keyBase + "_" + state,
+            icons.get("enemy_basic_idle")
+        );
     }
 
-    private void handleAfterBoss() {
+    private void handleAfterBoss(boolean spawnMerchant, JPanel grid) {
         // 1. ถามว่าจะเปิดกล่องรางวัลหรือไม่
         int open = JOptionPane.showConfirmDialog(
             this,
@@ -288,7 +409,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
             "Armor of Hero (100 Gems)",
             "Rainbow Potion (50 Gems)",
             "Red Potion (80 Gems)",
-            "Necklace: Remove Debuff (80 Gems)",
+            "Necklace of Hero (80 Gems)",
             "Holy Water (120 Gems)",
             "Sake (30 Gems)",
             "Quit Shop",
@@ -334,14 +455,17 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                         player.maxMana += 50; player.mana += 50;
                         JOptionPane.showMessageDialog(this, "Red Potion: MaxHP +100, Max Mana +50, Hp +100, Mana +50");
                         break;
-                    case "Necklace: Remove Debuff (80 Gems)":
+                    case "Necklace of Hero (80 Gems)":
                         hasNecklace = true;
-                        JOptionPane.showMessageDialog(this, "Remove debuffs");
+                        JOptionPane.showMessageDialog(this, "Remove ban-letter effect!");
                         break;
                     case "Holy Water (120 Gems)":
                         hasHolywater = true;
                         holyWaterCount++;
-                        JOptionPane.showMessageDialog(this, "Holy Water?");
+                        JOptionPane.showMessageDialog(
+                            this,
+                            String.format("Bought Holy Water! You now have %d bottle(s).", holyWaterCount)
+                        );
                         break;
                     case "Sake (30 Gems)":
                         hasSake = true;
@@ -360,7 +484,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         }
         merchantPanel.add(buttonPanel, BorderLayout.CENTER);
         // 2. ขวา: รูปพ่อค้า
-        ImageIcon merchantIcon = new ImageIcon(getClass().getResource("./images/secret_merchant.png"));
+        ImageIcon merchantIcon = new ImageIcon(getClass().getResource("/images/secret_merchant.png"));
         JLabel merchantImg = new JLabel(merchantIcon);
         merchantPanel.add(merchantImg, BorderLayout.EAST);
         // แสดง
@@ -437,7 +561,6 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                         kitsune.maxMana = 100;
                         kitsune.mana = 100;
                         kitsuneBuffActive = true;  // จะใช้ในด่าน 20
-                        player.baseDamage -= 550;
                         JOptionPane.showMessageDialog(this, "Kitsune Join your team!");
                     } else {
                         JOptionPane.showMessageDialog(this, "Kitsune: need Sake and Holy Water for healing!");
@@ -455,7 +578,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         eventPanel.add(btns, BorderLayout.CENTER);
     
         // รูป Kitsune ด้านขวา
-        ImageIcon ik = new ImageIcon(getClass().getResource("./images/kitsune.png"));
+        ImageIcon ik = new ImageIcon(getClass().getResource("/images/kitsune.png"));
         eventPanel.add(new JLabel(ik), BorderLayout.EAST);
     
         add(eventPanel, BorderLayout.CENTER);
@@ -475,7 +598,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
             kitsuneDmgLabel.setText( String.format("ATK: %d", kitsune.baseDamage) );
             kitsuneManaLabel.setText( String.format("Mana: %d / %d", kitsune.mana, kitsune.maxMana) );
             kitsuneImgLabel.setIcon(new ImageIcon(
-                getClass().getResource("./images/kitsune_idle.png")
+                getClass().getResource("/images/kitsune_idle.png")
             ));
         } else {
             kitsuneHpLabel.setText("");
@@ -526,11 +649,88 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         wordLabel.setText("Current: " + sb.toString().toLowerCase());
     }
 
-    private void onSubmit(JPanel grid) {
+    private void applyDebuffTicks() {
+        // --- POISON (Hero + Kitsune) ---
+        if (player.poisoned && player.poisonTurns > 0) {
+            player.hp -= 5;
+            player.poisonTurns--;
+            if (player.poisonTurns == 0) player.poisoned = false;
+            JOptionPane.showMessageDialog(this,
+                "You suffer 5 poison damage! (" + player.poisonTurns + " turns left)");
+        }
+        if (kitsune != null && kitsune.poisoned && kitsune.poisonTurns > 0) {
+            kitsune.hp -= 5;
+            kitsune.poisonTurns--;
+            if (kitsune.poisonTurns == 0) kitsune.poisoned = false;
+            JOptionPane.showMessageDialog(this,
+                "Kitsune suffers 5 poison damage! (" + kitsune.poisonTurns + " turns left)");
+        }
+    
+        // --- BLEEDING (Hero + Kitsune) ---
+        if (player.bleeding && player.bleedTurns > 0) {
+            player.hp -= 7;
+            player.bleedTurns--;
+            if (player.bleedTurns == 0) player.bleeding = false;
+            JOptionPane.showMessageDialog(this,
+                "You lose 7 HP from bleeding! (" + player.bleedTurns + " turns left)");
+        }
+        if (kitsune != null && kitsune.bleeding && kitsune.bleedTurns > 0) {
+            kitsune.hp -= 7;
+            kitsune.bleedTurns--;
+            if (kitsune.bleedTurns == 0) kitsune.bleeding = false;
+            JOptionPane.showMessageDialog(this,
+                "Kitsune loses 7 HP from bleeding! (" + kitsune.bleedTurns + " turns left)");
+        }
+    
+        // --- FIRE (Hero) ---
+        if (player.onFire) {
+            // if we still have a delay and HW to spend, ask…
+            if (player.fireTurns > 0 && holyWaterCount > 0) {
+                int choice = JOptionPane.showConfirmDialog(
+                    this,
+                    "You are burning! Use Holy Water to extinguish for 5 turns?",
+                    "Holy Water",
+                    JOptionPane.YES_NO_OPTION
+                );
+                if (choice == JOptionPane.YES_OPTION) {
+                    player.fireTurns = 5;
+                    holyWaterCount--;
+                    JOptionPane.showMessageDialog(
+                        this,
+                        String.format("You used Holy Water. Remaining: %d bottle(s).", holyWaterCount)
+                    );
+                }
+            } else {
+                // take the burn damage
+                player.hp -= 9;
+                JOptionPane.showMessageDialog(this, "You burn for 9 fire damage!");
+                if (player.fireTurns > 0) player.fireTurns--;
+            }
+            if (player.fireTurns == 0) {
+                player.onFire = false;
+            }
+        }
+    
+        // --- FIRE (Kitsune) ---
+        if (kitsune != null && kitsune.onFire) {
+            if (kitsune.fireTurns > 0) {
+                kitsune.fireTurns--;
+                kitsune.hp -= 9;
+                JOptionPane.showMessageDialog(this, "Kitsune burns for 9 fire damage!");
+            }
+            if (kitsune.fireTurns == 0) {
+                kitsune.onFire = false;
+            }
+        }
+    
+        updateStatusLabels();
+    }
+
+    public void onSubmit(JPanel grid) {
         playSound("attack.wav");
         playerImgLabel.setIcon(icons.get("hero_attack"));
         SwingUtilities.invokeLater(() -> {
-            try { Thread.sleep(300);} catch (Exception ignored) {}
+            try { Thread.sleep(300); } catch (Exception ignored) {}
             performPlayerAction(grid);
         });
     }
@@ -538,23 +738,23 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     // Decide reaction for monster's immediate response
     private Reaction decideReaction() {
         boolean isBoss = (currentLevel % 5 == 0);
-        double ch = rand.nextDouble();
-        double ht = isBoss?0.25:0.10;
-        double dt = isBoss?0.50:0.25;
-        if (ch < ht) return Reaction.HEAL;
-        else if (ch < dt) return Reaction.DEFEND;
+    
+        // โอกาส HEAL เหมือนเดิม
+        double healChance = isBoss ? 0.25 : 0.10;
+        // โอกาส DEFEND (รวม Counter) เพิ่มหลังด่าน 15
+        double defendChance = isBoss ? 0.50 : 0.25;
+        if (!isBoss && currentLevel > 15) {
+            defendChance += 0.20;  // +20%
+        }
+        // ถ้ามีบัฟ Kitsune ก็ล็อก defendChance = 50%
+        if (kitsuneBuffActive && !isBoss && currentLevel > 15) {
+            defendChance = 0.50;
+        }
+    
+        double roll = rand.nextDouble();
+        if (roll < healChance) return Reaction.HEAL;
+        else if (roll < defendChance) return Reaction.DEFEND;
         else return Reaction.COUNTER;
-    }
-
-    /**
-     * Generate random damage based on picking 3-5 random tiles
-     */
-    private int calculateRandomDamage() {
-        int len = 3 + rand.nextInt(3);
-        int sum = 0;
-        for (int i=0;i<len;i++) sum += gridModel.getTile(rand.nextInt(GRID_SIZE),rand.nextInt(GRID_SIZE)).getDmgPts();
-        int scaled = (int)(sum * ATTACK_MULTIPLIER);
-        return Math.min(scaled, ATTACK_CAP);
     }
 
     private void performPlayerAction(JPanel grid) {
@@ -620,23 +820,24 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
             if (monster.hp > 0) {
                 reactToPlayerAttack(react);
             } else {
-                if (currentLevel == 11 && hasSake && hasHolywater) {
+                if ((currentLevel == 11 || currentLevel == 16) && hasSake && hasHolywater) {
                     // เกิดอีเวนต์ Kitsune
                     openKitsuneEvent(grid);
                 } else if (currentLevel % 5 == 0) {
                     boolean spawn = shouldSpawnMerchant();
-                    handleAfterBoss();
-                    if (!spawn) nextLevel(grid);
+                    handleAfterBoss(spawn, grid);
                 } else {
                     nextLevel(grid);
                 }
             }
     }
+        applyDebuffTicks();
         clearSelection();
         updateStatusLabels();
     }
 
     private void reactToPlayerAttack(Reaction react) {
+
         boolean isBoss = (currentLevel%5==0);
         switch(react) {
             case HEAL:
@@ -653,11 +854,10 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                     monster.hp -= kitsune.baseDamage;
                     JOptionPane.showMessageDialog(this, "Kitsune COUNTER Attack " + kitsune.baseDamage + " Damage!");
                 }            
-                int rawDmg = calculateRandomDamage();
+                int rawDmg = monster.baseDamage + rand.nextInt(5); //สุ่ม 0–4 ดาเมจเพิ่มมาด้วย
                 int dmg = Math.max(1, rawDmg - player.armor);
                 if (shieldActive) { dmg/=2; shieldActive=false; JOptionPane.showMessageDialog(this,"Your shield blocks 50% of the counterattack!"); }
                 player.hp -= dmg;
-                // Kitsune โดนด้วยถ้ามี
                 if (kitsune != null) {
                     int kdmg = dmg;
                     if (kitsuneShieldActive) {
@@ -672,6 +872,54 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                 monsterImgLabel.setIcon(getMonsterIcon("attack"));
                 new Timer(1000,e->{ monsterImgLabel.setIcon(getMonsterIcon("idle")); ((Timer)e.getSource()).stop(); }).start();
                 JOptionPane.showMessageDialog(this, monster.name+" counterattacks for "+dmg+" damage!");
+                // 1) Poison 30% ด่าน 11–15
+                if (currentLevel >= 11 && currentLevel <= 15 && rand.nextDouble() < 0.30) {
+                    // ถ้ามี Kitsune อยู่ จะสุ่ม target 0=hero,1=kitsune,2=both
+                    int target = (kitsune != null) ? rand.nextInt(3) : 0;
+
+                    if (target == 0 || target == 2) {
+                        player.poisoned    = true;
+                        player.poisonTurns = 2;
+                        JOptionPane.showMessageDialog(this, "You have been poisoned! (2 turns)");
+                    }
+                    if (kitsune != null && (target == 1 || target == 2)) {
+                        kitsune.poisoned    = true;
+                        kitsune.poisonTurns = 2;
+                        JOptionPane.showMessageDialog(this, "Your Kitsune has been poisoned! (2 turns)");
+                    }
+                }
+
+                // 2) Bleeding 30% ด่าน 16–19
+                if (currentLevel >= 16 && currentLevel <= 19 && rand.nextDouble() < 0.30) {
+                    int target = (kitsune != null) ? rand.nextInt(3) : 0;
+
+                    if (target == 0 || target == 2) {
+                        player.bleeding   = true;
+                        player.bleedTurns = 2;
+                        JOptionPane.showMessageDialog(this, "You are bleeding! (2 turns)");
+                    }
+                    if (kitsune != null && (target == 1 || target == 2)) {
+                        kitsune.bleeding   = true;
+                        kitsune.bleedTurns = 2;
+                        JOptionPane.showMessageDialog(this, "Your Kitsune is bleeding! (2 turns)");
+                    }
+                }
+
+                // 3) Fire 30% บอสด่าน 20
+                if (currentLevel == 20 && rand.nextDouble() < 0.30) {
+                    int target = (kitsune != null) ? rand.nextInt(3) : 0;
+
+                    if (target == 0 || target == 2) {
+                        player.onFire    = true;
+                        player.fireTurns = Integer.MAX_VALUE;
+                        JOptionPane.showMessageDialog(this, "The dragon sets YOU ablaze!");
+                    }
+                    if (kitsune != null && (target == 1 || target == 2)) {
+                        kitsune.onFire    = true;
+                        kitsune.fireTurns = Integer.MAX_VALUE;
+                        JOptionPane.showMessageDialog(this, "The dragon sets your KITSUNE ablaze!");
+                    }
+                }
                 if (player.hp<=0) { playSound("gameover.wav"); JOptionPane.showMessageDialog(this,"You have been defeated..."); System.exit(0);}                
                 break;
         }
@@ -717,94 +965,120 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     }
 
     private void nextLevel(JPanel gridPanel) {
-        currentLevel++;
-        if (currentLevel>MAX_LEVEL) { JOptionPane.showMessageDialog(this,"You WIN!"); System.exit(0);}        
-        monster = createMonsterForLevel(currentLevel);
-        monsterImgLabel.setIcon(getMonsterIcon("idle"));
-        JOptionPane.showMessageDialog(this,"Level up! Now facing "+monster.name);
-        gridModel = new Grid(GRID_SIZE);
-        initGridPanel(gridPanel); clearSelection(); updateStatusLabels();
-    }
+            currentLevel++;
+            if (currentLevel > MAX_LEVEL) {
+                JOptionPane.showMessageDialog(this, "You WIN!");
+                System.exit(0);
+            }
+            monster = createMonsterForLevel(currentLevel);
+            monsterImgLabel.setIcon(getMonsterIcon("idle"));
+            // แจ้งเตือนเลเวลอัพ
+            JOptionPane.showMessageDialog(this, "Level up! Now facing " + monster.name);
+            // เมื่อถึงด่าน 11 หรือ 16 ให้บอกว่ามีของใหม่ในร้านค้า
+            if (currentLevel == 11) {
+                JOptionPane.showMessageDialog(this,
+                    "ํYou can buy new items in the shop!"
+                );
+            } else if (currentLevel == 16) {
+                JOptionPane.showMessageDialog(this,
+                    "ํYou can buy new items in the shop!"
+                );
+            }
+            // รีเซ็ตกริดและสถานะ
+            gridModel = new Grid(GRID_SIZE);
+            initGridPanel(gridPanel);
+            clearSelection();
+            updateStatusLabels();
+        }
 
     private void openShop() { openShopForPlayer(player); }
     public void openShopForPlayer(Entity e) {
-        String[] opts = {"Heal (5 Gems)","Shield (3 Gems)","BuffAtk (4 Gems)","Shuffle (6 Gems)","Close"};
+        // เตรียมรายการสินค้าให้ dynamic ตามด่าน
+        List<String> opts = new ArrayList<>(List.of(
+            "Heal (5 Gems)",
+            "Shield (3 Gems)",
+            "BuffAtk (4 Gems)",
+            "Shuffle (6 Gems)"
+        ));
+        // เปิดขาย Antidote ตั้งแต่ด่าน 11 ขึ้นไป
+        if (currentLevel >= 11) {
+            opts.add("Antidote (8 Gems)");
+        }
+        // เปิดขาย Bandage ตั้งแต่ด่าน 16 ขึ้นไป
+        if (currentLevel >= 16) {
+            opts.add("Bandage (10 Gems)");
+        }
+        opts.add("Close");
+    
+        String[] options = opts.toArray(new String[0]);
         while (true) {
-            int c = JOptionPane.showOptionDialog(this,
-                    "Gems: " + totalGems + "\nSelect Item to buy",
-                    "Shop",
-                    JOptionPane.DEFAULT_OPTION,
-                    JOptionPane.PLAIN_MESSAGE,
-                    null,
-                    opts,
-                    opts[0]
+            int choice = JOptionPane.showOptionDialog(
+                this,
+                "Gems: " + totalGems + "\nSelect Item to buy",
+                "Shop",
+                JOptionPane.DEFAULT_OPTION,
+                JOptionPane.PLAIN_MESSAGE,
+                null,
+                options,
+                options[0]
             );
-            if (c < 0 || c == opts.length - 1) break;
-            switch (c) {
-                case 0: // Heal
-                    if (totalGems >= 5) {
-                        totalGems -= 5;
-                        e.hp = Math.min(e.maxHp, e.hp + 20);
-                        if (kitsune != null) {
-                            kitsune.hp = Math.min(kitsune.maxHp, kitsune.hp + 20);
-                        }                        
-                        playSound("heal.wav");
-                        // Change hero image to heal
-                        playerImgLabel.setIcon(icons.get("hero_heal"));
-                        // Revert to idle after animation
-                        new Timer(1000, evt -> {
-                            playerImgLabel.setIcon(icons.get("hero_idle"));
-                            ((Timer) evt.getSource()).stop();
-                        }).start();
-                    } else {
-                        JOptionPane.showMessageDialog(this, "Not enough Gems");
-                    }
+            if (choice < 0 || options[choice].equals("Close")) {
+                break;
+            }
+    
+            String opt = options[choice];
+            int cost = Integer.parseInt(opt.replaceAll(".*\\((\\d+) Gems\\)", "$1"));
+            if (totalGems < cost) {
+                JOptionPane.showMessageDialog(this, "Not enough Gems");
+                continue;
+            }
+            totalGems -= cost;
+    
+            switch (opt) {
+                case "Heal (5 Gems)":
+                    e.hp = Math.min(e.maxHp, e.hp + 20);
+                    JOptionPane.showMessageDialog(this, "Healed 20 HP!");
                     break;
-                case 1: // Shield
-                    if (totalGems >= 3) {
-                        totalGems -= 3;
-                        shieldActive = true;
-                        if (kitsune != null) kitsuneShieldActive = true;
-                        playSound("defend.wav");
-                        // Change hero image to defend (shield)
-                        playerImgLabel.setIcon(icons.get("hero_defend"));
-                        // Revert to idle after animation
-                        new Timer(1000, evt -> {
-                            playerImgLabel.setIcon(icons.get("hero_idle"));
-                            ((Timer) evt.getSource()).stop();
-                        }).start();
-                    } else {
-                        JOptionPane.showMessageDialog(this, "Not enough Gems");
-                    }
+    
+                case "Shield (3 Gems)":
+                    shieldActive = true;
+                    if (kitsune != null) kitsuneShieldActive = true;
+                    JOptionPane.showMessageDialog(this, "Shield activated for 1 turn!");
                     break;
-                case 2: // BuffAtk
-                    if (totalGems >= 4) {
-                        totalGems -= 4;
-                        e.buffAttack += 10;
-                        playSound("buffatk.wav");
-                        playerImgLabel.setIcon(icons.get("hero_heal"));
-                        // Revert to idle after animation
-                        new Timer(1000, evt -> {
-                            playerImgLabel.setIcon(icons.get("hero_idle"));
-                            ((Timer) evt.getSource()).stop();
-                        }).start();
-                        JOptionPane.showMessageDialog(this, "Attack buff activated! +10 damage for this round.");
-                    } else {
-                        JOptionPane.showMessageDialog(this, "Not enough Gems");
-                    }
+    
+                case "BuffAtk (4 Gems)":
+                    e.buffAttack += 10;
+                    JOptionPane.showMessageDialog(this, "Attack buff +10 for this round!");
                     break;
-                case 3: // Shuffle
-                    if (totalGems >= 6) {
-                        totalGems -= 6;
-                        gridModel.shuffle();
-                        refreshGrid();
-                        clearSelection();
-                    } else {
-                        JOptionPane.showMessageDialog(this, "Not enough Gems");
-                    }
+    
+                case "Shuffle (6 Gems)":
+                    gridModel.shuffle();
+                    refreshGrid();
+                    clearSelection();
+                    JOptionPane.showMessageDialog(this, "Board shuffled!");
+                    break;
+    
+                case "Antidote (8 Gems)":
+                    e.poisoned    = false;
+                    e.poisonTurns = 0;
+                    JOptionPane.showMessageDialog(
+                        this,
+                        "Antidote used! Poison removed."
+                    );
+                    break;
+    
+                case "Bandage (10 Gems)":
+                    e.bleeding   = false;
+                    e.bleedTurns = 0;
+                    e.hp = Math.min(e.maxHp, e.hp + 10);
+                    JOptionPane.showMessageDialog(
+                        this,
+                        "Bandage used! Bleeding Stop."
+                    );
                     break;
             }
+    
+            updateStatusLabels();
         }
-        updateStatusLabels();
     }
 }

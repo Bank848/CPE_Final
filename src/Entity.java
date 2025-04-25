@@ -1,25 +1,35 @@
+// Entity.java
+
 public class Entity {
     public String name;
     public int hp, maxHp;
-    // สำหรับบัฟโจมตี
     public int buffAttack;
-    // สำหรับ Fire Debuff
     public int baseDamage;      // พลังโจมตีพื้นฐานจากดาบ
     public int armor;           // ค่าพลังป้องกันลดความเสียหาย
     public int mana, maxMana;   // ค่ามานาใช้งานสกิล
-    public boolean fireDebuff;
-    private boolean shieldActive = false;
-
+    private boolean shieldActive = false;    
+    public boolean onFire = false;
+    public int fireTurns = 0;    
+    public boolean poisoned = false;
+    public int poisonTurns = 0;
+    public boolean bleeding = false;
+    public int bleedTurns = 0;
+    
     public Entity(String name, int maxHp) {
         this.name = name;
         this.maxHp = maxHp;
         this.hp = maxHp;
-        this.baseDamage = 500;     // ตั้งค่าเริ่มต้น
+        this.baseDamage = 10;     // ตั้งค่าเริ่มต้น
         this.armor = 5;           // ตั้งค่าเริ่มต้น
         this.maxMana = 100;
         this.mana = this.maxMana;
         this.buffAttack = 0;
-        this.fireDebuff = false;
+        this.poisoned    = false;
+        this.poisonTurns = 0;
+        this.bleeding    = false;
+        this.bleedTurns  = 0;
+        this.onFire      = false;
+        this.fireTurns   = 0;
     }
 
     public boolean isAlive() {
@@ -28,15 +38,4 @@ public class Entity {
 
     public void setShield(boolean v) { shieldActive = v; }
     public boolean isShieldActive() { return shieldActive; }
-
-    // ล้างสถานะดีบัฟทั้งหมด (เรียกเมื่อซื้อ Necklace)
-    public void removeDebuffs() {
-        this.buffAttack = 0;
-        // รีเซ็ตดีบัฟหรือบัฟอื่นๆ ที่เพิ่มในอนาคต
-    }
-
-    // ล้าง Fire Debuff (เรียกเมื่อซื้อ Holy Water)
-    public void removeFireDebuff() {
-        this.fireDebuff = false;
-    }
 }

@@ -32,10 +32,16 @@ public class Grid {
     // สุ่มสร้าง Tile ใหม่
     private Tile createRandomTile() {
         char ch = randomLetter();
-        boolean special = rand.nextDouble() < 0.05;
+        boolean special = rand.nextDouble() < 0.15;  
+    
         int bp, lp;
+        GemType gemType = GemType.NONE;
+    
         if (special) {
-            bp = lp = rand.nextInt(3) + 5;
+            // เลือกชนิด gem แบบสุ่ม
+            GemType[] gems = { GemType.RED, GemType.BLUE, GemType.GREEN };
+            gemType = gems[rand.nextInt(gems.length)];
+            bp = lp = rand.nextInt(3) + 5;  // คะแนนสูง
         } else if (VOWELS.contains(ch)) {
             bp = rand.nextInt(3) + 1;
             lp = rand.nextInt(3) + 1;
@@ -46,7 +52,11 @@ public class Grid {
             bp = rand.nextInt(5) + 1;
             lp = rand.nextInt(5) + 1;
         }
-        return new Tile(ch, bp, lp, special);
+    
+        Tile tile = new Tile(ch, bp, lp, special);
+        tile.setGemType(gemType); // ตั้งค่า gem type ลงไป
+    
+        return tile;
     }
 
     private char randomLetter() {

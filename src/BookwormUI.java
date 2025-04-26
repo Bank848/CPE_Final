@@ -38,7 +38,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     private Entity player;
     private Entity monster;
     private int currentLevel = 1;
-    private int totalGems = 0;
+    private int totalGems = 990;
     private int skillPoints = 0;
     private boolean shieldActive = false;
 
@@ -467,6 +467,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
 
                     // แสดงข้อความหลังวิดีโอจบ
                     JOptionPane.showMessageDialog(this, "Kitsune's Legendary Blast! The dragon is obliterated!");
+                    playSound("win.wav");
                     JOptionPane.showMessageDialog(this, "YOU WIN!");
                     System.exit(0);
                 });
@@ -828,6 +829,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     private void nextLevel(JPanel gridPanel) {
             currentLevel++;
             if (currentLevel > MAX_LEVEL) {
+                playSound("win.wav");
                 JOptionPane.showMessageDialog(this, "You WIN!");
                 System.exit(0);
             }
@@ -1540,7 +1542,6 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         if (stallTurns > 0) {
             stallTurns--;
             if (stallTurns == 0) {
-                playSound("explosion.wav");
                 showExplosionVideo();  // จบเกม
             } else {
                 JOptionPane.showMessageDialog(this,

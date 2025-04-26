@@ -32,7 +32,7 @@ public class Grid {
     // สุ่มสร้าง Tile ใหม่
     private Tile createRandomTile() {
         char ch = randomLetter();
-        boolean special = rand.nextDouble() < 0.15;  
+        boolean special = rand.nextDouble() < 0.10;  
     
         int bp, lp;
         GemType gemType = GemType.NONE;
@@ -41,16 +41,16 @@ public class Grid {
             // เลือกชนิด gem แบบสุ่ม
             GemType[] gems = { GemType.RED, GemType.BLUE, GemType.GREEN };
             gemType = gems[rand.nextInt(gems.length)];
-            bp = lp = rand.nextInt(3) + 5;  // คะแนนสูง
+            bp = lp = rand.nextInt(8) + 5;  // คะแนนสูงสุด 5–12
         } else if (VOWELS.contains(ch)) {
-            bp = rand.nextInt(3) + 1;
-            lp = rand.nextInt(3) + 1;
+            bp = rand.nextInt(3) + 1; // สุ่ม 0–2 แล้ว +1 ⇒ ได้ 1–3
+            lp = rand.nextInt(5) + 1; // สุ่ม 1–3 เช่นกัน
         } else if (HARD.contains(ch)) {
-            bp = rand.nextInt(5) + 3;
-            lp = rand.nextInt(5) + 3;
+            bp = rand.nextInt(5) + 3; // สุ่ม 0–4 แล้ว +3 ⇒ ได้ 3–7
+            lp = rand.nextInt(7) + 3; // สุ่ม 3–9 เช่นกัน
         } else {
-            bp = rand.nextInt(5) + 1;
-            lp = rand.nextInt(5) + 1;
+            bp = rand.nextInt(5) + 1; // สุ่ม 0–4 แล้ว +1 ⇒ ได้ 1–5
+            lp = rand.nextInt(7) + 1; // สุ่ม 1–7 เช่นกัน
         }
     
         Tile tile = new Tile(ch, bp, lp, special);

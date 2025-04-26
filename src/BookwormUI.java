@@ -490,15 +490,17 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
             if (preFirePlayer) {
                 player.onFire = true;
                 player.fireTurns = Integer.MAX_VALUE;
+                JOptionPane.showMessageDialog(this, "Holy Water effect ends. You are now on fire!");
             }
             if (kitsune != null && preFireKitsune) {
                 kitsune.onFire = true;
                 kitsune.fireTurns = Integer.MAX_VALUE;
+                JOptionPane.showMessageDialog(this, "Holy Water effect ends. Your Kitsune is now on fire!");
             }
             // รีเซ็ต flag เพื่อไม่ให้รันซ้ำ
             usedHolyWater = false;
         }
-        
+
         // Hero
         playerHpLabel.setText( String.format("HP: %d / %d", player.hp, player.maxHp) );
         damageLabel.setText( String.format("ATK: %d", player.baseDamage) );

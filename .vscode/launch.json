@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "BookwormUI",
+      "request": "launch",
+      "mainClass": "BookwormUI",
+      "projectName": "CPE_Final_ccf97176"
+    },
+    {
+      "type": "java",
+      "name": "Launch BookwormUI",
+      "request": "launch",
+      "mainClass": "BookwormUI",
+      "projectName": "CPE_Final",
+      "vmArgs": "--module-path \"${workspaceFolder}/lib/javafx-sdk-21.0.7/lib\" --add-modules javafx.base,javafx.controls,javafx.graphics,javafx.swing,javafx.media",
+      "classPaths": [
+        "${workspaceFolder}/out"
+      ]
+    }
+  ]
+}

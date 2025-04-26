@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+  <!-- โค้ด Java ของคุณ -->
+  <classpathentry kind="src" path="src"/>
+  <!-- ไลบรารี JavaFX -->
+  <classpathentry kind="lib" path="lib/javafx-sdk-17.0.15/lib/javafx-base.jar"/>
+  <classpathentry kind="lib" path="lib/javafx-sdk-17.0.15/lib/javafx-graphics.jar"/>
+  <classpathentry kind="lib" path="lib/javafx-sdk-17.0.15/lib/javafx-swing.jar"/>
+  <classpathentry kind="lib" path="lib/javafx-sdk-17.0.15/lib/javafx-media.jar"/>
+  <classpathentry kind="lib" path="lib/javafx-sdk-17.0.15/lib/javafx-controls.jar"/>
+  <classpathentry kind="lib" path="lib/javafx-sdk-17.0.15/lib/javafx-fxml.jar"/>
+
+  <!-- Folder สำหรับ .class ที่คอมไพล์ -->
+  <classpathentry kind="output" path="bin"/>
+</classpath>

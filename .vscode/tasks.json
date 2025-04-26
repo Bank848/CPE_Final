@@ -1,0 +1,22 @@
+// .vscode/tasks.json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build BookwormUI",
+      "type": "shell",
+      "command": "javac",
+      "args": [
+        "--module-path", "${workspaceFolder}/lib/javafx-sdk-21.0.7/lib",
+        "--add-modules", "javafx.base,javafx.controls,javafx.graphics,javafx.swing,javafx.media",
+        "-d", "${workspaceFolder}/out",
+        "${workspaceFolder}/src/*.java"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$javac"]
+    }
+  ]
+}

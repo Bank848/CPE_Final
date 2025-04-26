@@ -20,7 +20,6 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.UIManager;
 import javax.swing.border.TitledBorder;
@@ -451,48 +450,4 @@ public class Bookworm2Player extends JFrame {
         }
     }
 
-    public static void main(String[] args) {
-        // 1) บังคับ Swing วาด title bar เองก่อน
-        JDialog.setDefaultLookAndFeelDecorated(true);
-    
-        // 2) ตั้งฟอนต์ใหญ่ให้ JOptionPane ทั่วไป
-        Font dialogFont  = new Font("SansSerif", Font.BOLD, 24);
-        Font dialogTitle = dialogFont.deriveFont(28f);
-        UIManager.put("OptionPane.messageFont", dialogFont);
-        UIManager.put("OptionPane.buttonFont",  dialogFont);
-        UIManager.put("OptionPane.font",        dialogFont);
-        UIManager.put("Dialog.titleFont",       dialogTitle);
-        UIManager.put("OptionPane.titleFont",   dialogTitle);
-    
-        // 3) สร้าง dialog เลือกโหมด
-        String[] modes = {"1 Player", "2 Player"};
-        UIManager.put("OptionPane.okButtonText", "OK");
-        UIManager.put("OptionPane.cancelButtonText", "Cancel");
-        int m = JOptionPane.showOptionDialog(
-            null,
-            "Select Game Mode",
-            "Bookworm Puzzle RPG",
-            JOptionPane.DEFAULT_OPTION,
-            JOptionPane.PLAIN_MESSAGE,
-            null,
-            modes,
-            modes[0]
-        );
-    
-        // 4) รัน UI ที่ต้องการ
-        if (m == 1) {
-            SwingUtilities.invokeLater(() -> {
-                Bookworm2Player frame = new Bookworm2Player();
-                // เต็มจอจริง
-                frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
-                frame.setVisible(true);
-            });
-        } else {
-            SwingUtilities.invokeLater(() -> {
-                BookwormUI frame = new BookwormUI();
-                frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
-                frame.setVisible(true);
-            });
-        }
-    }
 }

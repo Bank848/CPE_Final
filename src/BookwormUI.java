@@ -1,6 +1,7 @@
 //BookwormUI.java
 import java.awt.*;
-import java.util.*; // ใช้ ArrayList, List, Map, HashMap, Queue, LinkedList
+import java.net.URL; // ใช้ ArrayList, List, Map, HashMap, Queue, LinkedList
+import java.util.*;
 import java.util.List;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
@@ -9,6 +10,15 @@ import javax.sound.sampled.FloatControl;
 import javax.swing.*;
 import javax.swing.Timer;
 import javax.swing.border.TitledBorder;
+import javafx.application.Platform;
+import javafx.embed.swing.JFXPanel;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.layout.StackPane;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
+import javafx.scene.media.MediaView;
+
 
 public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RPG
     private static final int GRID_SIZE = 8;
@@ -28,8 +38,8 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     private Entity player;
     private Entity monster;
     private int currentLevel = 1;
-    private int totaldmgPts = 0;
     private int totalGems = 99990;
+    private int skillPoints = 0;
     private boolean shieldActive = false;
 
     private JLabel wordLabel, gemLabel;
@@ -58,6 +68,14 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     private JLabel kitsuneDmgLabel;
     private JLabel kitsuneManaLabel;
     private boolean kitsuneShieldActive = false;
+    private boolean hasLegendaryBook = false;
+    private int stallTurns = 0;
+    private int holyWaterBuffTurns = 0;
+    private boolean preFirePlayer = false;
+    private boolean preFireKitsune = false;
+    private boolean usedHolyWater = false;
+
+    private JFXPanel fxPanel;
 
 
     public BookwormUI() {
@@ -66,7 +84,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         JDialog.setDefaultLookAndFeelDecorated(true);
 
         // ————— เซ็ตฟอนต์ให้ Title ของทุก Dialog —————
-        Font dialogFont  = new Font("SansSerif", Font.BOLD, 24);
+        Font dialogFont  = new Font("SansSerif", Font.BOLD, 20);
         Font titleFont   = dialogFont.deriveFont(28f);
         UIManager.put("OptionPane.messageFont", dialogFont);
         UIManager.put("OptionPane.buttonFont",  dialogFont);
@@ -88,17 +106,24 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     }
 
     private void loadIcons() {
-        String[] states = {"idle","attack","defend","heal"};
+        String[] states = {"idle","attack","defend","heal","magic"};
         // Hero
         for (String st: states) {
-            icons.put("hero_" + st,
-                new ImageIcon(getClass().getResource("/images/hero_" + st + ".png")));
+            String key = "hero_" + st;
+            String path = "/images/" + key + ".png";
+            URL url = getClass().getResource(path);
+            if (url != null) {
+                icons.put(key, new ImageIcon(url));
+            } else {
+                System.err.println("Missing resource: " + path);
+                // ถ้าไฟล์ magic ไม่เจอ จะใช้ idle แทน ไม่ให้ crash
+                icons.put(key, icons.getOrDefault("hero_idle", new ImageIcon()));
+            }
         }
         // Monster & Boss
         for (int lvl = 1; lvl <= MAX_LEVEL; lvl++) {
             String keyBase;
             if (lvl % 5 == 0) {
-                // บอสทุก 5 ด่าน
                 switch(lvl) {
                     case 5:  keyBase = "boss5_highGoblin";   break;
                     case 10: keyBase = "boss10_kingGoblin";  break;
@@ -111,14 +136,47 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
             } else if (lvl >= 16 && lvl <= 19) {
                 keyBase = "enemy_lizardGirl";
             } else {
-                // ระหว่าง 1–4,6–9 ใช้ generic monster เดียวกัน
                 keyBase = "enemy_basic";
             }
-            for (String st: states) {
-                icons.put(keyBase + "_" + st,
-                    new ImageIcon(getClass().getResource("/images/" + keyBase + "_" + st + ".png")));
+            for (String st: new String[]{"idle","attack","defend","heal"}) {
+                String key = keyBase + "_" + st;
+                String path = "/images/" + key + ".png";
+                URL url = getClass().getResource(path);
+                if (url != null) {
+                    icons.put(key, new ImageIcon(url));
+                } else {
+                    System.err.println("Missing resource: " + path);
+                    icons.put(key, icons.getOrDefault(keyBase + "_idle", new ImageIcon()));
+                }
             }
         }
+    }
+
+    private ImageIcon getMonsterIcon(String state) {
+        String keyBase;
+        if (currentLevel % 5 == 0) {
+            // บอสด่าน 5,10,15,20
+            switch (currentLevel) {
+                case 5:  keyBase = "boss5_highGoblin";   break;
+                case 10: keyBase = "boss10_kingGoblin";  break;
+                case 15: keyBase = "boss15_spiderQueen"; break;
+                case 20: keyBase = "boss20_dragonLord";  break;  // <-- ให้ตรงกับ loadIcons()
+                default: keyBase = "boss" + currentLevel;         break;
+            }
+        } else if (currentLevel >= 11 && currentLevel <= 14) {
+            keyBase = "enemy_spiderGirl";
+        } else if (currentLevel >= 16 && currentLevel <= 19) {
+            keyBase = "enemy_lizardGirl";
+        } else {
+            // ด่าน 1–4 และ 6–9
+            keyBase = "enemy_basic";
+        }
+    
+        // ถ้าไม่มี ก็ fallback ให้ดูอย่างน้อยเจอ generic
+        return icons.getOrDefault(
+            keyBase + "_" + state,
+            icons.get("enemy_basic_idle")
+        );
     }
 
     public void playSound(String soundFileName) {
@@ -346,12 +404,16 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         JButton submitBtn = new JButton("Submit"); submitBtn.setFont(defaultFont); submitBtn.setPreferredSize(new Dimension(150,50));
         JButton clearBtn = new JButton("Clear"); clearBtn.setFont(defaultFont); clearBtn.setPreferredSize(new Dimension(150,50));
         JButton shopBtn = new JButton("Shop"); shopBtn.setFont(defaultFont); shopBtn.setPreferredSize(new Dimension(150,50));
+        JButton statusBtn = new JButton("Status"); statusBtn.setFont(defaultFont); statusBtn.setPreferredSize(new Dimension(150,50));
+        JButton skillsBtn = new JButton("Skills"); skillsBtn.setFont(defaultFont); skillsBtn.setPreferredSize(new Dimension(150,50));
         JButton optionsBtn = new JButton("Options"); optionsBtn.setFont(defaultFont); optionsBtn.setPreferredSize(new Dimension(150,50));
         submitBtn.addActionListener(e -> onSubmit(gridPanel));
         clearBtn.addActionListener(e -> clearSelection());
         shopBtn.addActionListener(e -> openShop());
+        statusBtn.addActionListener(e -> openStatusDialog());
+        skillsBtn.addActionListener(e -> openSkillsDialog());
         optionsBtn.addActionListener(e -> openOptionsDialog());
-        control.add(submitBtn); control.add(clearBtn); control.add(shopBtn); control.add(optionsBtn); control.add(gemLabel);
+        control.add(submitBtn); control.add(clearBtn); control.add(shopBtn); control.add(statusBtn); control.add(skillsBtn); control.add(optionsBtn); control.add(gemLabel);
         if (DEV_MODE) {
             JButton skipBtn = new JButton("Skip Level"); skipBtn.setFont(defaultFont); skipBtn.setPreferredSize(new Dimension(150,50));
             skipBtn.addActionListener(e -> nextLevel(gridPanel)); control.add(skipBtn);
@@ -372,6 +434,46 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         return totalGems;
     }
 
+    private void showExplosionVideo() {
+        remove(gridPanel);
+        fxPanel = new JFXPanel();
+        add(fxPanel, BorderLayout.CENTER);
+        revalidate(); repaint();
+
+        Platform.runLater(() -> {
+            String uri = getClass().getResource("/videos/explosion.mp4").toExternalForm();
+            Media media = new Media(uri);
+            MediaPlayer player = new MediaPlayer(media);
+            MediaView view = new MediaView(player);
+
+            // ปรับขนาดให้เต็ม และ preserve ratio
+            view.setFitWidth(fxPanel.getWidth());
+            view.setFitHeight(fxPanel.getHeight());
+            view.setPreserveRatio(true);
+
+            // ใช้ StackPane เพื่อกึ่งกลางอัตโนมัติ
+            StackPane root = new StackPane(view);
+            root.setAlignment(Pos.CENTER);
+            Scene scene = new Scene(root);
+            fxPanel.setScene(scene);
+
+            player.play();
+            player.setOnEndOfMedia(() -> {
+                player.dispose();
+                SwingUtilities.invokeLater(() -> {
+                    remove(fxPanel);
+                    add(gridPanel, BorderLayout.CENTER);
+                    revalidate(); repaint();
+
+                    // แสดงข้อความหลังวิดีโอจบ
+                    JOptionPane.showMessageDialog(this, "Kitsune's Legendary Blast! The dragon is obliterated!");
+                    JOptionPane.showMessageDialog(this, "YOU WIN!");
+                    System.exit(0);
+                });
+            });
+        });
+    }
+
     // Overload เพื่อรองรับ 2-player
     public void performPlayerAction(JPanel grid, Entity actor) {
         // สลับ player ภายในเพื่องานเดิม
@@ -381,34 +483,22 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         player = prevPlayer;
     }
 
-    private ImageIcon getMonsterIcon(String state) {
-        String keyBase;
-        if (currentLevel % 5 == 0) {
-            // บอสด่าน 5,10,15,20
-            switch (currentLevel) {
-                case 5:  keyBase = "boss5_highGoblin";   break;
-                case 10: keyBase = "boss10_kingGoblin";  break;
-                case 15: keyBase = "boss15_spiderQueen"; break;
-                case 20: keyBase = "boss20_dragonLord";  break;  // <-- ให้ตรงกับ loadIcons()
-                default: keyBase = "boss" + currentLevel;         break;
-            }
-        } else if (currentLevel >= 11 && currentLevel <= 14) {
-            keyBase = "enemy_spiderGirl";
-        } else if (currentLevel >= 16 && currentLevel <= 19) {
-            keyBase = "enemy_lizardGirl";
-        } else {
-            // ด่าน 1–4 และ 6–9
-            keyBase = "enemy_basic";
-        }
-    
-        // ถ้าไม่มี ก็ fallback ให้ดูอย่างน้อยเจอ generic
-        return icons.getOrDefault(
-            keyBase + "_" + state,
-            icons.get("enemy_basic_idle")
-        );
-    }
-
     private void updateStatusLabels() {
+
+        if (currentLevel == 20 && usedHolyWater && holyWaterBuffTurns == 0) {
+            // คืนสถานะไฟเดิมตาม preFire flags
+            if (preFirePlayer) {
+                player.onFire = true;
+                player.fireTurns = Integer.MAX_VALUE;
+            }
+            if (kitsune != null && preFireKitsune) {
+                kitsune.onFire = true;
+                kitsune.fireTurns = Integer.MAX_VALUE;
+            }
+            // รีเซ็ต flag เพื่อไม่ให้รันซ้ำ
+            usedHolyWater = false;
+        }
+        
         // Hero
         playerHpLabel.setText( String.format("HP: %d / %d", player.hp, player.maxHp) );
         damageLabel.setText( String.format("ATK: %d", player.baseDamage) );
@@ -440,6 +530,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
 
         // Gems
         gemLabel.setText("Gems: " + totalGems);
+    
     }
 
     private void onLetterClick(JButton btn) {
@@ -519,6 +610,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     }
 
     private void performPlayerAction(JPanel grid) {
+        boolean actionUsed = false;
         StringBuilder sb = new StringBuilder();
         boolean special = false;
         for (Position p: selectedPos) {
@@ -531,25 +623,21 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
             JOptionPane.showMessageDialog(this,"Word invalid.");
             playerImgLabel.setIcon(icons.get("hero_idle"));
         } else {
-            // แยกคำนวณ damage จาก tile
+            // คำนวณ damage จาก tile
             int tileDmg = 0, gainG = 0;
             for (Position p: selectedPos) {
                 Tile t = gridModel.getTile(p.row,p.col);
                 tileDmg += t.getDmgPts();
                 gainG += t.getGemPts();
             }
-            // ถ้าเป็น special ให้คูณสองเฉพาะ tile damage
             if (special) {
                 tileDmg *= 2;
                 JOptionPane.showMessageDialog(this,"Special tile! Damage doubled and board will reset.");
             }
-            // สร้าง raw damage โดยบวกบัฟหลังคูณสอง
-            int raw = player.baseDamage + tileDmg + player.buffAttack;            // รีเซ็ตบัฟใช้ครั้งเดียว
+            int raw = player.baseDamage + tileDmg + player.buffAttack;
             player.buffAttack = 0;
-
-            // เพิ่มสถิติ
-            totaldmgPts += tileDmg;
             totalGems += gainG * gemMultiplier;
+            actionUsed = true;  // <-- บอกว่าทำดาเมจจริง
 
             // สถานะ monster ตอบโต้
             Reaction react = decideReaction();
@@ -595,6 +683,15 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         applyDebuffTicks();
         clearSelection();
         updateStatusLabels();
+        if (actionUsed && stallTurns > 0) {
+            stallTurns--;
+            if (stallTurns == 0) {
+                showExplosionVideo();  
+            } else {
+                JOptionPane.showMessageDialog(this, String.format("You delayed %d turn(s) remaining...", stallTurns));
+            }
+            return;
+        }
     }
 
     private void reactToPlayerAttack(Reaction react) {
@@ -614,7 +711,8 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                 if (kitsune != null && react == Reaction.COUNTER && rand.nextDouble() < 0.3) {
                     monster.hp -= kitsune.baseDamage;
                     JOptionPane.showMessageDialog(this, "Kitsune COUNTER Attack " + kitsune.baseDamage + " Damage!");
-                }            
+                }         
+
                 int rawDmg = monster.baseDamage + rand.nextInt(5); //สุ่ม 0–4 ดาเมจเพิ่มมาด้วย
                 int dmg = Math.max(1, rawDmg - player.armor);
                 if (shieldActive) { dmg/=2; shieldActive=false; JOptionPane.showMessageDialog(this,"Your shield blocks 50% of the counterattack!"); }
@@ -667,7 +765,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                 }
 
                 // 3) Fire 30% บอสด่าน 20
-                if (currentLevel == 20 && rand.nextDouble() < 0.30) {
+                if (currentLevel == 20 && rand.nextDouble() < 0.90) {
                     int target = (kitsune != null) ? rand.nextInt(3) : 0;
 
                     if (target == 0 || target == 2) {
@@ -731,6 +829,17 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                 JOptionPane.showMessageDialog(this, "You WIN!");
                 System.exit(0);
             }
+            // ถ้าเพิ่งถึงด่าน 20 และมี Legendary Book + Kitsune
+            if (currentLevel == 20 && hasLegendaryBook && kitsune != null) {
+                JOptionPane.showMessageDialog(this, "Speaking of which, how about letting Kitsune take a look at the book you bought from the secret merchant?");
+                JOptionPane.showMessageDialog(this, "It looks like Kitsune can read it, but it might take some time.");
+                JOptionPane.showMessageDialog(this, "Notice: Kitsune is trying to read the Legendary Book. You need to buy time for 5 turns.");                
+                stallTurns = 5;
+            }
+            // มอบ Skill Points (2 แต้มต่อเลเวล)
+            skillPoints += 2;
+            JOptionPane.showMessageDialog(this,
+                String.format("You earned 2 Skill Points (Total: %d).", currentLevel, skillPoints));            
             monster = createMonsterForLevel(currentLevel);
             monsterImgLabel.setIcon(getMonsterIcon("idle"));
             // แจ้งเตือนเลเวลอัพ
@@ -760,9 +869,9 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         // เตรียมรายการสินค้า dynamic ตามด่าน
         List<String> opts = new ArrayList<>(List.of(
             "Heal (5 Gems)",
-            "Shield (3 Gems)",
-            "BuffAtk (4 Gems)",
-            "Shuffle (6 Gems)"
+            "Shield (5 Gems)",
+            "Shuffle (6 Gems)",
+            "Mana Potion (20 Gems)"
         ));
         if (currentLevel >= 11) {
             opts.add("Antidote (8 Gems)");
@@ -772,72 +881,86 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         }
         opts.add("Close");
     
-        String[] options = opts.toArray(new String[0]);
         while (true) {
-            int choice = JOptionPane.showOptionDialog(
-                this,
-                "Gems: " + totalGems + "\nSelect Item to buy",
-                "Shop",
-                JOptionPane.DEFAULT_OPTION,
-                JOptionPane.PLAIN_MESSAGE,
-                null,
-                options,
-                options[0]
-            );
-            // กดปิดหรือเลือก Close --> ออก
-            if (choice < 0 || options[choice].equals("Close")) {
+            // สร้าง panel หลัก
+            JPanel content = new JPanel(new BorderLayout(10, 10));
+            JLabel title = new JLabel("Gems: " + totalGems + "    Select Item to buy", SwingConstants.CENTER);
+            title.setFont(title.getFont().deriveFont(24f)); // ขยายฟอนต์หัวข้อ
+            content.add(title, BorderLayout.NORTH);
+    
+            // คำนวนจำนวนแถวเพื่อให้ได้ 2 คอลัมน์
+            int cols = 2;
+            int rows = (opts.size() + cols - 1) / cols;
+            JPanel btnPanel = new JPanel(new GridLayout(rows, cols, 10, 10));
+    
+            // ตัวแปรเก็บผลลัพธ์การเลือก
+            final String[] selected = { null };
+    
+            // สร้างปุ่มแต่ละอัน
+            for (String opt : opts) {
+                JButton btn = new JButton(opt);
+                btn.setFont(btn.getFont().deriveFont(20f));       // ขยายฟอนต์ปุ่ม
+                btn.setPreferredSize(new Dimension(200, 60));    // ตั้งขนาดปุ่มให้ใหญ่ขึ้น
+                btn.addActionListener(evt -> {
+                    selected[0] = opt;
+                    SwingUtilities.getWindowAncestor(btn).setVisible(false);
+                });
+                btnPanel.add(btn);
+            }
+    
+            content.add(btnPanel, BorderLayout.CENTER);
+    
+            // สร้าง dialog
+            JDialog dialog = new JDialog(this, "Shop", true);
+            dialog.getContentPane().add(content);
+            dialog.pack();
+    
+            // ขยายขนาด dialog 2 เท่า
+            Dimension d = dialog.getSize();
+            dialog.setSize(d.width * 2, d.height * 2);
+    
+            dialog.setLocationRelativeTo(this);
+            dialog.setVisible(true);
+    
+            String choice = selected[0];
+            dialog.dispose();
+    
+            // ถ้าปิดหรือกด Close -> ออก
+            if (choice == null || choice.equals("Close")) {
                 break;
             }
     
-            String opt = options[choice];
-            int cost = Integer.parseInt(opt.replaceAll(".*\\((\\d+) Gems\\)", "$1"));
+            // หัก gem แล้วทำงานตามปุ่ม
+            int cost = Integer.parseInt(choice.replaceAll(".*\\((\\d+) Gems\\)", "$1"));
             if (totalGems < cost) {
                 JOptionPane.showMessageDialog(this, "Not enough Gems");
                 continue;
             }
             totalGems -= cost;
     
-            switch (opt) {
+            switch (choice) {
                 case "Heal (5 Gems)":
                     e.hp = Math.min(e.maxHp, e.hp + 20);
-                    if (kitsune != null) {
-                        kitsune.hp = Math.min(kitsune.maxHp, kitsune.hp + 20);
-                    }                        
+                    if (kitsune != null) kitsune.hp = Math.min(kitsune.maxHp, kitsune.hp + 20);
                     playSound("heal.wav");
-                    // Change hero image to heal
                     playerImgLabel.setIcon(icons.get("hero_heal"));
-                    // Revert to idle after animation
-                    new Timer(1000, evt -> {
+                    new Timer(1000, ev -> {
                         playerImgLabel.setIcon(icons.get("hero_idle"));
-                        ((Timer) evt.getSource()).stop();
+                        ((Timer) ev.getSource()).stop();
                     }).start();
                     JOptionPane.showMessageDialog(this, "Healed 20 HP!");
                     break;
     
-                case "Shield (3 Gems)":
+                case "Shield (5 Gems)":
                     shieldActive = true;
                     if (kitsune != null) kitsuneShieldActive = true;
                     playSound("defend.wav");
-                    // Change hero image to defend (shield)
                     playerImgLabel.setIcon(icons.get("hero_defend"));
-                    // Revert to idle after animation
-                    new Timer(1000, evt -> {
+                    new Timer(1000, ev -> {
                         playerImgLabel.setIcon(icons.get("hero_idle"));
-                        ((Timer) evt.getSource()).stop();
+                        ((Timer) ev.getSource()).stop();
                     }).start();
                     JOptionPane.showMessageDialog(this, "Shield activated for 1 turn!");
-                    break;
-    
-                case "BuffAtk (4 Gems)":
-                    e.buffAttack += 10;
-                    playSound("buffatk.wav");
-                    playerImgLabel.setIcon(icons.get("hero_heal"));
-                    // Revert to idle after animation
-                    new Timer(1000, evt -> {
-                        playerImgLabel.setIcon(icons.get("hero_idle"));
-                        ((Timer) evt.getSource()).stop();
-                    }).start();
-                    JOptionPane.showMessageDialog(this, "Attack buff +10 for this round!");
                     break;
     
                 case "Shuffle (6 Gems)":
@@ -847,42 +970,40 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                     JOptionPane.showMessageDialog(this, "Board shuffled!");
                     break;
     
-                case "Antidote (8 Gems)":
-                    e.poisoned    = false;
-                    e.poisonTurns = 0;
-                    if (kitsune != null) {
-                        kitsune.poisoned    = false;
-                        kitsune.poisonTurns = 0;
-                    }
+                case "Mana Potion (20 Gems)":
+                    player.mana = Math.min(player.maxMana, player.mana + 10);
+                    if (kitsune != null) kitsune.mana = Math.min(kitsune.maxMana, kitsune.mana + 10);
                     playSound("heal.wav");
-                    // Change hero image to heal
                     playerImgLabel.setIcon(icons.get("hero_heal"));
-                    // Revert to idle after animation
-                    new Timer(1000, evt -> {
+                    new Timer(1000, ev -> {
                         playerImgLabel.setIcon(icons.get("hero_idle"));
-                        ((Timer) evt.getSource()).stop();
-                    }).start();                    
+                        ((Timer)ev.getSource()).stop();
+                    }).start();
+                    JOptionPane.showMessageDialog(this, "Mana Potion used! +10 Mana.");
+                    break;
+    
+                case "Antidote (8 Gems)":
+                    e.poisoned = false; e.poisonTurns = 0;
+                    if (kitsune != null) { kitsune.poisoned = false; kitsune.poisonTurns = 0; }
+                    playSound("heal.wav");
+                    playerImgLabel.setIcon(icons.get("hero_heal"));
+                    new Timer(1000, ev -> {
+                        playerImgLabel.setIcon(icons.get("hero_idle"));
+                        ((Timer)ev.getSource()).stop();
+                    }).start();
                     JOptionPane.showMessageDialog(this, "Antidote used! Poison removed.");
                     break;
     
                 case "Bandage (10 Gems)":
-                    e.bleeding   = false;
-                    e.bleedTurns = 0;
-                    if (kitsune != null) {
-                        kitsune.bleeding   = false;
-                        kitsune.bleedTurns = 0;
-                    }
+                    e.bleeding = false; e.bleedTurns = 0;
+                    if (kitsune != null) { kitsune.bleeding = false; kitsune.bleedTurns = 0; }
                     e.hp = Math.min(e.maxHp, e.hp + 10);
-                    if (kitsune != null) {
-                        kitsune.hp = Math.min(kitsune.maxHp, kitsune.hp + 10);
-                    }                        
+                    if (kitsune != null) kitsune.hp = Math.min(kitsune.maxHp, kitsune.hp + 10);
                     playSound("heal.wav");
-                    // Change hero image to heal
                     playerImgLabel.setIcon(icons.get("hero_heal"));
-                    // Revert to idle after animation
-                    new Timer(1000, evt -> {
+                    new Timer(1000, ev -> {
                         playerImgLabel.setIcon(icons.get("hero_idle"));
-                        ((Timer) evt.getSource()).stop();
+                        ((Timer)ev.getSource()).stop();
                     }).start();
                     JOptionPane.showMessageDialog(this, "Bandage used! Bleeding stopped and +10 HP.");
                     break;
@@ -932,6 +1053,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
             "Rainbow Potion (50 Gems)",
             "Red Potion (80 Gems)",
             "Necklace of Hero (80 Gems)",
+            "Legendary Book (300 Gems)", 
             "Holy Water (120 Gems)",
             "Sake (30 Gems)",
             "Quit Shop",
@@ -981,6 +1103,21 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                     case "Necklace of Hero (80 Gems)":
                         hasNecklace = true;
                         JOptionPane.showMessageDialog(this, "Remove ban-letter effect!");
+                        break;
+                    case "Legendary Book (300 Gems)":
+                        if (hasLegendaryBook) {
+                            JOptionPane.showMessageDialog(this, "You already own the Legendary Book!");
+                        } else if (totalGems < 300) {
+                            JOptionPane.showMessageDialog(this, "Not enough Gems!");
+                        } else {
+                            totalGems -= 300;
+                            hasLegendaryBook = true;
+                            JOptionPane.showMessageDialog(this,
+                                "You obtained the Legendary Book! You try to read it, but can't understand it");
+                            buttonPanel.remove(b);
+                            purchasedItems.add(opt);
+                            buttonPanel.revalidate(); buttonPanel.repaint();
+                        }
                         break;
                     case "Holy Water (120 Gems)":
                         hasHolywater = true;
@@ -1110,80 +1247,369 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         validate(); repaint();
     }
     private void applyDebuffTicks() {
-        // --- POISON (Hero + Kitsune) ---
+        // 1) หากยังอยู่ในช่วง Holy Water Protection ให้นับรอบและคืนสถานะเมื่อหมด
+        if (holyWaterBuffTurns > 0) {
+            holyWaterBuffTurns--;
+            JOptionPane.showMessageDialog(this,
+                String.format("Holy Water protection: %d turn(s) remaining.", holyWaterBuffTurns)
+            );
+    
+            // พอหมดบัฟ ให้คืนสถานะไฟเดิม แล้วถามใช้ต่อไหม
+            if (holyWaterBuffTurns == 0) {
+                JOptionPane.showMessageDialog(this, "Holy Water effect has worn off.");
+    
+                // คืนสถานะไฟเดิม
+                if (preFirePlayer) {
+                    player.onFire = true;
+                    player.fireTurns = Integer.MAX_VALUE;
+                }
+                if (preFireKitsune) {
+                    kitsune.onFire = true;
+                    kitsune.fireTurns = Integer.MAX_VALUE;
+                }
+                // รีเซ็ต flag เพื่อรอบถัดไป
+                preFirePlayer = false;
+                preFireKitsune = false;
+    
+                // ถ้ายังมีขวดเหลือ และยังมีไฟ ให้ถามใช้ต่อ
+                boolean nowPlayerBurn = player.onFire && player.fireTurns > 0;
+                boolean nowKitsuneBurn = kitsune != null && kitsune.onFire && kitsune.fireTurns > 0;
+                if (holyWaterCount > 0 && (nowPlayerBurn || nowKitsuneBurn)) {
+                    int choice = JOptionPane.showConfirmDialog(
+                        this,
+                        "You are still burning! Use Holy Water to extinguish for 5 more turns?",
+                        "Holy Water",
+                        JOptionPane.YES_NO_OPTION
+                    );
+                    if (choice == JOptionPane.YES_OPTION) {
+                        // บันทึกสถานะไฟปัจจุบันก่อนดับ
+                        preFirePlayer = nowPlayerBurn;
+                        preFireKitsune = nowKitsuneBurn;
+                        usedHolyWater = true;
+
+                        // ดับไฟ
+                        if (nowPlayerBurn) {
+                            player.onFire = false;
+                            player.fireTurns = 0;
+                        }
+                        if (nowKitsuneBurn) {
+                            kitsune.onFire = false;
+                            kitsune.fireTurns = 0;
+                        }
+                        holyWaterCount--;
+                        holyWaterBuffTurns = 5;
+                        JOptionPane.showMessageDialog(this,
+                            String.format("You used Holy Water again. Remaining: %d bottle(s).", holyWaterCount)
+                        );
+                    }
+                }
+            }
+    
+            updateStatusLabels();
+            return;
+        }
+    
+        // 2) POISON
         if (player.poisoned && player.poisonTurns > 0) {
             player.hp -= 5;
             player.poisonTurns--;
             if (player.poisonTurns == 0) player.poisoned = false;
             JOptionPane.showMessageDialog(this,
-                "You suffer 5 poison damage! (" + player.poisonTurns + " turns left)");
+                "You suffer 5 poison damage! (" + player.poisonTurns + " turns left)"
+            );
         }
         if (kitsune != null && kitsune.poisoned && kitsune.poisonTurns > 0) {
             kitsune.hp -= 5;
             kitsune.poisonTurns--;
             if (kitsune.poisonTurns == 0) kitsune.poisoned = false;
             JOptionPane.showMessageDialog(this,
-                "Kitsune suffers 5 poison damage! (" + kitsune.poisonTurns + " turns left)");
+                "Kitsune suffers 5 poison damage! (" + kitsune.poisonTurns + " turns left)"
+            );
         }
     
-        // --- BLEEDING (Hero + Kitsune) ---
+        // 3) BLEEDING
         if (player.bleeding && player.bleedTurns > 0) {
             player.hp -= 7;
             player.bleedTurns--;
             if (player.bleedTurns == 0) player.bleeding = false;
             JOptionPane.showMessageDialog(this,
-                "You lose 7 HP from bleeding! (" + player.bleedTurns + " turns left)");
+                "You lose 7 HP from bleeding! (" + player.bleedTurns + " turns left)"
+            );
         }
         if (kitsune != null && kitsune.bleeding && kitsune.bleedTurns > 0) {
             kitsune.hp -= 7;
             kitsune.bleedTurns--;
             if (kitsune.bleedTurns == 0) kitsune.bleeding = false;
             JOptionPane.showMessageDialog(this,
-                "Kitsune loses 7 HP from bleeding! (" + kitsune.bleedTurns + " turns left)");
+                "Kitsune loses 7 HP from bleeding! (" + kitsune.bleedTurns + " turns left)"
+            );
         }
     
-        // --- FIRE (Hero) ---
-        if (player.onFire) {
-            // if we still have a delay and HW to spend, ask…
-            if (player.fireTurns > 0 && holyWaterCount > 0) {
-                int choice = JOptionPane.showConfirmDialog(
-                    this,
-                    "You are burning! Use Holy Water to extinguish for 5 turns?",
-                    "Holy Water",
-                    JOptionPane.YES_NO_OPTION
-                );
-                if (choice == JOptionPane.YES_OPTION) {
-                    player.fireTurns = 5;
-                    holyWaterCount--;
-                    JOptionPane.showMessageDialog(
-                        this,
-                        String.format("You used Holy Water. Remaining: %d bottle(s).", holyWaterCount)
-                    );
-                }
+        // 4) FIRE (ก่อนใช้ Holy Water)
+        boolean playerBurn = player.onFire && player.fireTurns > 0;
+        boolean kitsuneBurn = kitsune != null && kitsune.onFire && kitsune.fireTurns > 0;
+        if ((playerBurn || kitsuneBurn) && holyWaterCount > 0) {
+            String msg;
+            if (playerBurn && kitsuneBurn) {
+                msg = "You and your Kitsune are burning! Use Holy Water to extinguish for 5 turns?";
+            } else if (playerBurn) {
+                msg = "You are burning! Use Holy Water to extinguish for 5 turns?";
             } else {
-                // take the burn damage
-                player.hp -= 9;
-                JOptionPane.showMessageDialog(this, "You burn for 9 fire damage!");
-                if (player.fireTurns > 0) player.fireTurns--;
+                msg = "Your Kitsune is burning! Use Holy Water to extinguish for 5 turns?";
             }
-            if (player.fireTurns == 0) {
-                player.onFire = false;
+    
+            int choice = JOptionPane.showConfirmDialog(
+                this,
+                msg,
+                "Holy Water",
+                JOptionPane.YES_NO_OPTION
+            );
+            if (choice == JOptionPane.YES_OPTION) {
+                // บันทึกสถานะไฟเดิม
+                preFirePlayer = playerBurn;
+                preFireKitsune = kitsuneBurn;
+    
+                // ดับไฟ
+                if (playerBurn) {
+                    player.onFire = false;
+                    player.fireTurns = 0;
+                }
+                if (kitsuneBurn) {
+                    kitsune.onFire = false;
+                    kitsune.fireTurns = 0;
+                }
+                holyWaterCount--;
+                holyWaterBuffTurns = 5;
+                JOptionPane.showMessageDialog(this,
+                    String.format("You used Holy Water. Remaining: %d bottle(s).", holyWaterCount)
+                );
+                updateStatusLabels();
+                return;
             }
         }
     
-        // --- FIRE (Kitsune) ---
-        if (kitsune != null && kitsune.onFire) {
-            if (kitsune.fireTurns > 0) {
-                kitsune.fireTurns--;
-                kitsune.hp -= 9;
-                JOptionPane.showMessageDialog(this, "Kitsune burns for 9 fire damage!");
-            }
-            if (kitsune.fireTurns == 0) {
-                kitsune.onFire = false;
-            }
+        // 5) ถ้าไม่ได้ใช้ Holy Water ก็รับความเสียหายปกติ
+        if (playerBurn) {
+            player.hp -= 9;
+            JOptionPane.showMessageDialog(this, "You burn for 9 fire damage!");
+            player.fireTurns--;
+            if (player.fireTurns <= 0) player.onFire = false;
+        }
+        if (kitsuneBurn) {
+            kitsune.hp -= 9;
+            JOptionPane.showMessageDialog(this, "Kitsune burns for 9 fire damage!");
+            kitsune.fireTurns--;
+            if (kitsune.fireTurns <= 0) kitsune.onFire = false;
         }
     
+        // 6) อัพเดต UI สถานะทั้งหมด
         updateStatusLabels();
     }
+    
+
+    private void openStatusDialog() {
+        Font dialogFont = new Font("SansSerif", Font.BOLD, 18);
+        UIManager.put("OptionPane.messageFont", dialogFont);
+        UIManager.put("OptionPane.buttonFont", dialogFont);
+    
+        // สร้าง panel หลัก
+        JPanel panel = new JPanel(new GridLayout(5, 3, 10, 10));
+        panel.add(new JLabel("Skill Points:"));
+        JLabel ptsLabel = new JLabel(String.valueOf(skillPoints));
+        ptsLabel.setFont(dialogFont);
+        panel.add(ptsLabel);
+        panel.add(new JLabel()); // spacer
+    
+        // รายการสเตตัส กับค่าเพิ่ม
+        String[] labels = {"Max HP (+5)", "Max Mana (+3)", "ATK (+3)", "Armor (+3)"};
+        for (String lbl : labels) {
+            panel.add(new JLabel(lbl));
+            JButton plus = new JButton("+");
+            plus.setFont(dialogFont);
+            panel.add(plus);
+            panel.add(new JLabel());
+            plus.addActionListener(e -> {
+                if (skillPoints <= 0) {
+                    JOptionPane.showMessageDialog(this, "No more Skill Points!");
+                    return;
+                }
+                // อัปสเตตัสตามป้าย
+                switch (lbl) {
+                    case "Max HP (+5)":
+                        player.maxHp += 5;
+                        player.hp = Math.min(player.hp, player.maxHp);
+                        break;
+                    case "Max Mana (+3)":
+                        player.maxMana += 3;
+                        player.mana = Math.min(player.mana, player.maxMana);
+                        break;
+                    case "ATK (+3)":
+                        player.baseDamage += 3;
+                        break;
+                    case "Armor (+3)":
+                        player.armor += 3;
+                        break;
+                }
+                // ลด skillPoints
+                skillPoints--;
+                // อัปเดต JLabel ใน dialog ให้แสดงค่าใหม่
+                ptsLabel.setText(String.valueOf(skillPoints));
+                updateStatusLabels();
+            });
+        }
+    
+        // แสดง dialog แบบไม่มีปุ่ม OK/Cancel — ปิดได้คลิกที่กากบาท
+        JDialog dlg = new JDialog(this, "Distribute Skill Points", true);
+        dlg.getContentPane().add(panel);
+        dlg.pack();
+        dlg.setLocationRelativeTo(this);
+        dlg.setVisible(true);
+    }
+    private void openSkillsDialog() {
+        // รายชื่อสกิล, ค่า Mana, และดาเมจ
+        String[] skillNames = {
+            "Attack Buff",   // 20 Mana → +10 DMG (ไม่จบเทิร์น)
+            "Fireball",      // 32 Mana → 30 DMG
+            "Flame Wave",    // 48 Mana → 50 DMG
+            "Inferno",       // 80 Mana → 90 DMG
+            "Phoenix Strike" // 100 Mana → 120 DMG
+        };
+        int[] manaCost = {20, 32, 48, 80, 100};
+        int[] damage   = {10, 30, 50, 90, 120};
+    
+        // ตั้งฟอนต์ให้ JOptionPane
+        Font f = new Font("SansSerif", Font.BOLD, 18);
+        UIManager.put("OptionPane.messageFont", f);
+        UIManager.put("OptionPane.buttonFont",  f);
+    
+        // สร้างปุ่มเลือกสกิล พร้อมปุ่ม Cancel
+        String[] buttons = Arrays.copyOf(skillNames, skillNames.length + 1);
+        buttons[skillNames.length] = "Cancel";
+    
+        int choice = JOptionPane.showOptionDialog(
+            this,
+            String.format("Mana: %d / %d\nSelect a skill:", player.mana, player.maxMana),
+            "Skills",
+            JOptionPane.DEFAULT_OPTION,
+            JOptionPane.PLAIN_MESSAGE,
+            null,
+            buttons,
+            buttons[0]
+        );
+        if (choice < 0 || choice >= skillNames.length) {
+            // กด Cancel หรือปิด dialog
+            return;
+        }
+    
+        // ตรวจ Mana
+        if (player.mana < manaCost[choice]) {
+            JOptionPane.showMessageDialog(this, "Not enough Mana!");
+            return;
+        }
+        player.mana -= manaCost[choice];
+    
+        // แสดงอนิเมชันเวทมนต์
+        playerImgLabel.setIcon(icons.get("hero_magic"));
+        playSound("magic.wav");
+        new Timer(1500, ev -> {
+            playerImgLabel.setIcon(icons.get("hero_idle"));
+            ((Timer)ev.getSource()).stop();
+        }).start();
+    
+        // ถ้าเป็น Attack Buff → ไม่จบเทิร์น
+        if ("Attack Buff".equals(skillNames[choice])) {
+            player.buffAttack += damage[choice];
+            JOptionPane.showMessageDialog(this,
+                String.format("Attack Buff! +%d damage on next attack (same turn).", damage[choice])
+            );
+            updateStatusLabels();
+            return;
+        }
+    
+        // สกิลที่ทำดาเมจ → จบเทิร์น: ลด HP มอนสเตอร์
+        monster.hp -= damage[choice];
+        JOptionPane.showMessageDialog(this,
+            String.format("%s deals %d magic damage!", skillNames[choice], damage[choice])
+        );
+        updateStatusLabels();
+        Reaction react = decideReaction();
+
+        // 2) ลด stallTurns เฉพาะเมื่อกำลังอยู่ในช่วง delay
+        if (stallTurns > 0) {
+            stallTurns--;
+            if (stallTurns == 0) {
+                playSound("explosion.wav");
+                showExplosionVideo();  // จบเกม
+            } else {
+                JOptionPane.showMessageDialog(this,
+                    String.format("You delayed %d turn(s) remaining...", stallTurns)
+                );
+            }
+            // **ลบ return ทิ้ง** เพื่อให้โค้ดยันต่อไปข้างล่าง
+        }
+        
+        // 3) ตรวจว่ามอนสเตอร์ตายหรือยัง
+        if (monster.hp <= 0) {
+            if ((currentLevel == 11 || currentLevel == 16) && hasSake && hasHolywater) {
+                openKitsuneEvent(gridPanel);
+            } else if (currentLevel % 5 == 0) {
+                boolean spawn = shouldSpawnMerchant();
+                handleAfterBoss(spawn, gridPanel);
+            } else {
+                nextLevel(gridPanel);
+            }
+        } else {
+            // 4) ถ้ามอนสเตอร์ยังไม่ตาย ให้มันตอบโต้ตาม reaction จริง
+            reactToPlayerAttack(react);
+            applyDebuffTicks();       
+            updateStatusLabels();
+        }
+    }
+    
+    
+    public static void main(String[] args) {
+        // 1) บังคับ Swing วาด title bar เองก่อน
+        JDialog.setDefaultLookAndFeelDecorated(true);
+    
+        // 2) ตั้งฟอนต์ใหญ่ให้ JOptionPane ทั่วไป
+        Font dialogFont  = new Font("SansSerif", Font.BOLD, 24);
+        Font dialogTitle = dialogFont.deriveFont(28f);
+        UIManager.put("OptionPane.messageFont", dialogFont);
+        UIManager.put("OptionPane.buttonFont",  dialogFont);
+        UIManager.put("OptionPane.font",        dialogFont);
+        UIManager.put("Dialog.titleFont",       dialogTitle);
+        UIManager.put("OptionPane.titleFont",   dialogTitle);
+    
+        // 3) สร้าง dialog เลือกโหมด
+        String[] modes = {"1 Player", "2 Player"};
+        UIManager.put("OptionPane.okButtonText", "OK");
+        UIManager.put("OptionPane.cancelButtonText", "Cancel");
+        int m = JOptionPane.showOptionDialog(
+            null,
+            "Select Game Mode",
+            "Bookworm Puzzle RPG",
+            JOptionPane.DEFAULT_OPTION,
+            JOptionPane.PLAIN_MESSAGE,
+            null,
+            modes,
+            modes[0]
+        );
+    
+        // 4) รัน UI ที่ต้องการ
+        if (m == 1) {
+            SwingUtilities.invokeLater(() -> {
+                Bookworm2Player frame = new Bookworm2Player();
+                // เต็มจอจริง
+                frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+                frame.setVisible(true);
+            });
+        } else {
+            SwingUtilities.invokeLater(() -> {
+                BookwormUI frame = new BookwormUI();
+                frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+                frame.setVisible(true);
+            });
+        }
+    }    
 
 }

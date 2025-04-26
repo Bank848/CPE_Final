@@ -38,7 +38,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     private Entity player;
     private Entity monster;
     private int currentLevel = 1;
-    private int totalGems = 99990;
+    private int totalGems = 0;
     private int skillPoints = 0;
     private boolean shieldActive = false;
 
@@ -767,7 +767,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                 }
 
                 // 3) Fire 30% บอสด่าน 20
-                if (currentLevel == 20 && rand.nextDouble() < 0.90) {
+                if (currentLevel == 20 && rand.nextDouble() < 0.30) {
                     int target = (kitsune != null) ? rand.nextInt(3) : 0;
 
                     if (target == 0 || target == 2) {

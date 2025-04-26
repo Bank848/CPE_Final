@@ -800,17 +800,43 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
             switch (opt) {
                 case "Heal (5 Gems)":
                     e.hp = Math.min(e.maxHp, e.hp + 20);
+                    if (kitsune != null) {
+                        kitsune.hp = Math.min(kitsune.maxHp, kitsune.hp + 20);
+                    }                        
+                    playSound("heal.wav");
+                    // Change hero image to heal
+                    playerImgLabel.setIcon(icons.get("hero_heal"));
+                    // Revert to idle after animation
+                    new Timer(1000, evt -> {
+                        playerImgLabel.setIcon(icons.get("hero_idle"));
+                        ((Timer) evt.getSource()).stop();
+                    }).start();
                     JOptionPane.showMessageDialog(this, "Healed 20 HP!");
                     break;
     
                 case "Shield (3 Gems)":
                     shieldActive = true;
                     if (kitsune != null) kitsuneShieldActive = true;
+                    playSound("defend.wav");
+                    // Change hero image to defend (shield)
+                    playerImgLabel.setIcon(icons.get("hero_defend"));
+                    // Revert to idle after animation
+                    new Timer(1000, evt -> {
+                        playerImgLabel.setIcon(icons.get("hero_idle"));
+                        ((Timer) evt.getSource()).stop();
+                    }).start();
                     JOptionPane.showMessageDialog(this, "Shield activated for 1 turn!");
                     break;
     
                 case "BuffAtk (4 Gems)":
                     e.buffAttack += 10;
+                    playSound("buffatk.wav");
+                    playerImgLabel.setIcon(icons.get("hero_heal"));
+                    // Revert to idle after animation
+                    new Timer(1000, evt -> {
+                        playerImgLabel.setIcon(icons.get("hero_idle"));
+                        ((Timer) evt.getSource()).stop();
+                    }).start();
                     JOptionPane.showMessageDialog(this, "Attack buff +10 for this round!");
                     break;
     
@@ -824,13 +850,40 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                 case "Antidote (8 Gems)":
                     e.poisoned    = false;
                     e.poisonTurns = 0;
+                    if (kitsune != null) {
+                        kitsune.poisoned    = false;
+                        kitsune.poisonTurns = 0;
+                    }
+                    playSound("heal.wav");
+                    // Change hero image to heal
+                    playerImgLabel.setIcon(icons.get("hero_heal"));
+                    // Revert to idle after animation
+                    new Timer(1000, evt -> {
+                        playerImgLabel.setIcon(icons.get("hero_idle"));
+                        ((Timer) evt.getSource()).stop();
+                    }).start();                    
                     JOptionPane.showMessageDialog(this, "Antidote used! Poison removed.");
                     break;
     
                 case "Bandage (10 Gems)":
                     e.bleeding   = false;
                     e.bleedTurns = 0;
+                    if (kitsune != null) {
+                        kitsune.bleeding   = false;
+                        kitsune.bleedTurns = 0;
+                    }
                     e.hp = Math.min(e.maxHp, e.hp + 10);
+                    if (kitsune != null) {
+                        kitsune.hp = Math.min(kitsune.maxHp, kitsune.hp + 10);
+                    }                        
+                    playSound("heal.wav");
+                    // Change hero image to heal
+                    playerImgLabel.setIcon(icons.get("hero_heal"));
+                    // Revert to idle after animation
+                    new Timer(1000, evt -> {
+                        playerImgLabel.setIcon(icons.get("hero_idle"));
+                        ((Timer) evt.getSource()).stop();
+                    }).start();
                     JOptionPane.showMessageDialog(this, "Bandage used! Bleeding stopped and +10 HP.");
                     break;
             }

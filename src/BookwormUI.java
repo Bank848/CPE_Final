@@ -435,6 +435,10 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     }
 
     private void showExplosionVideo() {
+        if (kitsune != null) {
+            kitsuneImgLabel.setIcon(new ImageIcon(getClass().getResource("/images/kitsune_magic.png")));
+        }    
+
         remove(gridPanel);
         fxPanel = new JFXPanel();
         add(fxPanel, BorderLayout.CENTER);
@@ -513,9 +517,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
             kitsuneHpLabel.setText( String.format("HP: %d / %d", kitsune.hp, kitsune.maxHp) );
             kitsuneDmgLabel.setText( String.format("ATK: %d", kitsune.baseDamage) );
             kitsuneManaLabel.setText( String.format("Mana: %d / %d", kitsune.mana, kitsune.maxMana) );
-            kitsuneImgLabel.setIcon(new ImageIcon(
-                getClass().getResource("/images/kitsune_idle.png")
-            ));
+            kitsuneImgLabel.setIcon(new ImageIcon(getClass().getResource("/images/kitsune_idle.png")));
         } else {
             kitsuneHpLabel.setText("");
             kitsuneDmgLabel.setText("");
@@ -683,7 +685,9 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                 }
             }
     }
-        applyDebuffTicks();
+        if (actionUsed) {
+            applyDebuffTicks();    // จะรันก็ต่อเมื่อเราใช้ action ทำดาเมจเท่านั้น
+        }
         clearSelection();
         updateStatusLabels();
         if (actionUsed && stallTurns > 0) {
@@ -714,6 +718,12 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                 if (kitsune != null && react == Reaction.COUNTER && rand.nextDouble() < 0.3) {
                     monster.hp -= kitsune.baseDamage;
                     JOptionPane.showMessageDialog(this, "Kitsune COUNTER Attack " + kitsune.baseDamage + " Damage!");
+                    kitsuneImgLabel.setIcon(icons.get("kitsune_attack"));
+                    new Timer(1000, e2 -> {
+                        kitsuneImgLabel.setIcon(new ImageIcon(
+                            getClass().getResource("/images/kitsune_idle.png")));
+                        ((Timer)e2.getSource()).stop();
+                    }).start();
                 }         
 
                 int rawDmg = monster.baseDamage + rand.nextInt(5); //สุ่ม 0–4 ดาเมจเพิ่มมาด้วย
@@ -964,6 +974,13 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                         playerImgLabel.setIcon(icons.get("hero_idle"));
                         ((Timer) ev.getSource()).stop();
                     }).start();
+                    if (kitsune != null) {
+                        kitsuneImgLabel.setIcon(new ImageIcon(getClass().getResource("/images/kitsune_defend.png")));
+                        new Timer(1000, ev -> {
+                            kitsuneImgLabel.setIcon(new ImageIcon(getClass().getResource("/images/kitsune_idle.png")));
+                            ((Timer) ev.getSource()).stop();
+                        }).start();
+                    }
                     JOptionPane.showMessageDialog(this, "Shield activated for 1 turn!");
                     break;
     

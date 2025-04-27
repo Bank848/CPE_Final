@@ -19,7 +19,7 @@ public class Entity {
         this.name = name;
         this.maxHp = maxHp;
         this.hp = maxHp;
-        this.baseDamage = 10;     // ตั้งค่าเริ่มต้น
+        this.baseDamage = 1000;     // ตั้งค่าเริ่มต้น
         this.armor = 5;           // ตั้งค่าเริ่มต้น
         this.maxMana = 100;
         this.mana = 0;

@@ -21,7 +21,7 @@ import javafx.scene.media.MediaView;
 
 
 public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RPG
-    private static final int GRID_SIZE = 8;
+    private static final int GRID_SIZE = 8;  
     private static final int MAX_LEVEL = 20;
     private static final boolean DEV_MODE = true;
     private static final int HP_INCREMENT = 4;
@@ -38,7 +38,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
     private Entity player;
     private Entity monster;
     private int currentLevel = 1;
-    private int totalGems = 990;
+    private int totalGems = 9900;
     private int skillPoints = 0;
     private boolean shieldActive = false;
 
@@ -751,13 +751,13 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
 
                     if (target == 0 || target == 2) {
                         player.poisoned    = true;
-                        player.poisonTurns = 2;
-                        JOptionPane.showMessageDialog(this, "You have been poisoned! (2 turns)");
+                        player.poisonTurns = 3;
+                        JOptionPane.showMessageDialog(this, "You have been poisoned! (3 turns)");
                     }
                     if (kitsune != null && (target == 1 || target == 2)) {
                         kitsune.poisoned    = true;
-                        kitsune.poisonTurns = 2;
-                        JOptionPane.showMessageDialog(this, "Your Kitsune has been poisoned! (2 turns)");
+                        kitsune.poisonTurns = 3;
+                        JOptionPane.showMessageDialog(this, "Your Kitsune has been poisoned! (3 turns)");
                     }
                 }
 
@@ -767,13 +767,13 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
 
                     if (target == 0 || target == 2) {
                         player.bleeding   = true;
-                        player.bleedTurns = 2;
-                        JOptionPane.showMessageDialog(this, "You are bleeding! (2 turns)");
+                        player.bleedTurns = 3;
+                        JOptionPane.showMessageDialog(this, "You are bleeding! (3 turns)");
                     }
                     if (kitsune != null && (target == 1 || target == 2)) {
                         kitsune.bleeding   = true;
-                        kitsune.bleedTurns = 2;
-                        JOptionPane.showMessageDialog(this, "Your Kitsune is bleeding! (2 turns)");
+                        kitsune.bleedTurns = 3;
+                        JOptionPane.showMessageDialog(this, "Your Kitsune is bleeding! (3 turns)");
                     }
                 }
 
@@ -1038,7 +1038,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         // 1. ถามว่าจะเปิดกล่องรางวัลหรือไม่
         int open = JOptionPane.showConfirmDialog(
             this,
-            "You found Loot Box Do you want to open it?",
+            "You found Loot Box. Do you want to open it?",
             "Loot Box",
             JOptionPane.YES_NO_OPTION
         );
@@ -1049,6 +1049,10 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         // 2. ตรวจสอบโอกาสเกิดพ่อค้าลับ
         if (shouldSpawnMerchant()) {
             openSecretMerchant();
+            // note: openSecretMerchant’s “Quit Shop” button already calls nextLevel(grid)
+        } else {
+            // No merchant: move directly to next level
+            nextLevel(grid);
         }
     }
 
@@ -1057,9 +1061,13 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         if (currentLevel == 10 || currentLevel == 15) {
             return true;
         }
-        // ด่านอื่น ๆ ให้โอกาสเกิด 50%
-        return rand.nextDouble() < 0.50;
-    }
+        // ด่าน 5 ให้โอกาสเกิด 50%
+        if (currentLevel == 5) {
+            return rand.nextDouble() < 0.50;
+        }
+        // ด่านอื่นๆ ไม่เกิด
+        return false;
+    }    
 
     private void openSecretMerchant() {
         // ซ่อนกริด

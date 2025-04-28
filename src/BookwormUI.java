@@ -1071,6 +1071,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
 
     private void openSecretMerchant() {
         // ซ่อนกริด
+        playSound("merchant.wav");
         remove(gridPanel);
         // เตรียม merchant panel
         JPanel merchantPanel = new JPanel(new BorderLayout(10,10));

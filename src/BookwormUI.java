@@ -126,7 +126,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
             if (lvl % 5 == 0) {
                 switch(lvl) {
                     case 5:  keyBase = "boss5_highGoblin";   break;
-                    case 10: keyBase = "boss10_kingGoblin";  break;
+                    case 10: keyBase = "boss10_GoblinQueen";  break;
                     case 15: keyBase = "boss15_spiderQueen"; break;
                     case 20: keyBase = "boss20_dragonLord";  break;
                     default: keyBase = "boss" + lvl;         break;
@@ -158,7 +158,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
             // บอสด่าน 5,10,15,20
             switch (currentLevel) {
                 case 5:  keyBase = "boss5_highGoblin";   break;
-                case 10: keyBase = "boss10_kingGoblin";  break;
+                case 10: keyBase = "boss10_GoblinQueen";  break;
                 case 15: keyBase = "boss15_spiderQueen"; break;
                 case 20: keyBase = "boss20_dragonLord";  break;  // <-- ให้ตรงกับ loadIcons()
                 default: keyBase = "boss" + currentLevel;         break;
@@ -472,7 +472,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                     // แสดงข้อความหลังวิดีโอจบ
                     JOptionPane.showMessageDialog(this, "Kitsune's Legendary Blast! The dragon is obliterated!");
                     playSound("win.wav");
-                    JOptionPane.showMessageDialog(this, "YOU WIN!");
+                    JOptionPane.showMessageDialog(this, "YOU WIN [Secret Ending]!");
                     System.exit(0);
                 });
             });
@@ -1627,7 +1627,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
         // 4) รัน UI ที่ต้องการ
         if (m == 1) {
             SwingUtilities.invokeLater(() -> {
-                Bookworm2Player frame = new Bookworm2Player();
+                Bookworm2PlayerWithMana frame = new Bookworm2PlayerWithMana();
                 // เต็มจอจริง
                 frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
                 frame.setVisible(true);

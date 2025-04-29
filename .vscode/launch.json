@@ -3,6 +3,13 @@
   "configurations": [
     {
       "type": "java",
+      "name": "Bookworm2PlayerWithMana",
+      "request": "launch",
+      "mainClass": "Bookworm2PlayerWithMana",
+      "projectName": "CPE_Final_ccf97176"
+    },
+    {
+      "type": "java",
       "name": "BookwormUI",
       "request": "launch",
       "mainClass": "BookwormUI",

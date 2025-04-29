@@ -30,10 +30,6 @@ public class Bookworm2PlayerWithMana extends JFrame {
 
     private Map<String, ImageIcon> icons = new HashMap<>();
 
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new Bookworm2PlayerWithMana());
-    }
-
     public Bookworm2PlayerWithMana() {
         super("Bookworm 2 Player Mode");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -42,6 +38,7 @@ public class Bookworm2PlayerWithMana extends JFrame {
         selectedPos = new ArrayList<>();
         selectedBtn = new ArrayList<>();
         loadIcons();
+        playSound("selectyouchampion.wav");
         player1 = chooseChampion(1);
         player2 = chooseChampion(2);
         currentPlayer = player1;
@@ -51,6 +48,12 @@ public class Bookworm2PlayerWithMana extends JFrame {
         initUI();
         // เริ่มต้นด้วยรอบแรก
         playSound("round1.wav");
+        int delayMs = 1500; // 1.5 วินาที
+
+        new javax.swing.Timer(delayMs, e -> {
+            playSound("fight.wav");
+            ((javax.swing.Timer)e.getSource()).stop();
+        }).start();
     }
 
     private void loadIcons() {
@@ -279,7 +282,7 @@ public class Bookworm2PlayerWithMana extends JFrame {
         wordLabel.setText("Word: " + sb);
         dmgPreviewLabel.setText("DMG Preview: " + dmg);
     }
-    
+
     private void clearSelection() {
         for (JButton b : selectedBtn) {
             Position p = (Position) b.getClientProperty("pos");
@@ -293,69 +296,90 @@ public class Bookworm2PlayerWithMana extends JFrame {
     }
 
     private void onSubmit(JPanel gridPanel) {
-        int totalDmg = 0; // Declare and initialize totalDmg
+        int totalDmg = 0;
+    
+        // ถ้ามีโล่ จะกันดาเมจครึ่งหนึ่ง
         if (opponent.shield) {
-            playSound("defend.wav");           // เพิ่มตรงนี้
-            totalDmg /= 2;
+            playSound("defend.wav");
             opponent.shield = false;
-            JOptionPane.showMessageDialog(this, opponent.name + " blocked half the damage!");
+            JOptionPane.showMessageDialog(this,
+                opponent.name + " blocked half the damage!");
         }
-        String w = wordLabel.getText().substring(6);
+    
+        String w = wordLabel.getText().substring(6);  // ดึงคำที่เลือกมา
         if (w.length() < 3 || !dict.contains(w)) {
             JOptionPane.showMessageDialog(this, "Invalid word");
             clearSelection();
             return;
         }
+    
+        // เล่นเสียงโจมตี และเปลี่ยนเป็นภาพโจมตี
         playSound("attack.wav");
-
-        int base=0, gem=0;
+        animateAction("attack");
+    
+        // คำนวณดาเมจและเก็บเพชร
+        int base = 0, gem = 0;
         for (Position p : selectedPos) {
-            Tile t = gridModel.getTile(p.row,p.col);
-            base += t.getDmgPts();  gem  += t.getGemPts();
-            if (t.isSpecial()) base *=2;
+            Tile t = gridModel.getTile(p.row, p.col);
+            base += t.getDmgPts();
+            gem  += t.getGemPts();
+            if (t.isSpecial()) base *= 2;
         }
         totalDmg = base + currentPlayer.buffAttack;
-        if (opponent.shield) {
-            totalDmg /=2; opponent.shield = false;
-        }
         opponent.hp -= totalDmg;
         currentPlayer.buffAttack = 0;
-        if (currentPlayer == player1) p1Gems += gem; else p2Gems += gem;
-
+    
+        if (currentPlayer == player1) {
+            p1Gems += gem;
+        } else {
+            p2Gems += gem;
+        }
+    
         JOptionPane.showMessageDialog(this,
-            currentPlayer.name+" dealt "+totalDmg+" dmg, gained "+gem+" gems"
-        );
-
+            currentPlayer.name + " dealt " + totalDmg + " dmg, gained " + gem + " gems");
+    
+        // อัปเดตบอร์ด
         gridModel.removeAndCollapse(selectedPos);
         clearSelection();
         refreshGrid(gridPanel);
-
-        // จบรอบถ้า HP คู่ต่อสู้ <= 0
+    
+        // ถ้าคนไหน HP หมด ให้จบรอบ
         if (opponent.hp <= 0) {
-            // อัปเดตคะแนน
+            playSound("KO.wav");
             if (currentPlayer == player1) p1Wins++; else p2Wins++;
-            scoreLabel.setText("Score – P1: "+p1Wins+", P2: "+p2Wins);
-
-            // ถ้าจบรอบก่อนแมตช์
-            if (p1Wins==2 || p2Wins==2 || currentRound==3) {
-                playSound("Youwin.wav");
-                String winner = p1Wins>p2Wins ? player1.name : player2.name;
-                JOptionPane.showMessageDialog(this, winner+" wins the match!");
+            scoreLabel.setText("Score – P1: " + p1Wins + ", P2: " + p2Wins);
+    
+            // จบแมตช์เมื่อใครชนะ 2 หรือเล่นครบ 3 รอบ
+            if (p1Wins == 2 || p2Wins == 2 || currentRound == 3) {
+                playSound("win.wav");
+                String winner = (p1Wins > p2Wins) ? player1.name : player2.name;
+                JOptionPane.showMessageDialog(this, winner + " wins the match!");
                 System.exit(0);
             }
-
+    
             // เริ่มรอบใหม่
             currentRound++;
             roundLabel.setText("Round: "+currentRound+" / 3");
-            playSound("round"+currentRound+".wav");
+            int delayMs = 1500; // 1.5 วินาที
 
-            // รีเซ็ต HP/Mana/กริด
-            player1.hp = player1.maxHp;  player1.mana = player1.maxMana;
-            player2.hp = player2.maxHp;  player2.mana = player2.maxMana;
+            new javax.swing.Timer(delayMs, e -> {
+                playSound("round"+currentRound+".wav");
+                ((javax.swing.Timer)e.getSource()).stop();
+            }).start();
+
+            new javax.swing.Timer(delayMs, e -> {
+                playSound("fight.wav");
+                ((javax.swing.Timer)e.getSource()).stop();
+            }).start();
+
+            // รีเซ็ตสถานะผู้เล่นและกริด
+            player1.hp = player1.maxHp;   player1.mana = player1.maxMana;
+            player2.hp = player2.maxHp;   player2.mana = player2.maxMana;
             gridModel = new Grid(GRID_SIZE);
             updateStatus();
+            refreshGrid(gridPanel);
         } else {
-            // สลับเทิร์นปกติ
+            // ไม่จบรอบ สลับเทิร์น
             nextTurn();
         }
     }
@@ -544,7 +568,7 @@ public class Bookworm2PlayerWithMana extends JFrame {
         String[] required = {
             "fight.wav", "attack.wav", "magic.wav", "defend.wav",
             "round1.wav", "round2.wav", "round3.wav",
-            "Youwin.wav", "select.wav"   // เพิ่ม select.wav
+            "win.wav", "select.wav" ,"selectyouchampion.wav","KO.wav"
         };
         for (String fn : required) {
             if (getClass().getResource("/sounds/" + fn) == null) {

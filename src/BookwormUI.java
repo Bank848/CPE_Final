@@ -944,10 +944,32 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                 break;
             }
     
+            // เช็คเงื่อนไขก่อนซื้อ
+            switch (choice) {
+                case "Heal (5 Gems)":
+                    if (e.hp >= e.maxHp && (kitsune == null || kitsune.hp >= kitsune.maxHp)) {
+                        JOptionPane.showMessageDialog(this, "Your HP is already full.");
+                        continue;
+                    }
+                    break;
+                case "Shield (5 Gems)":
+                    if (shieldActive) {
+                        JOptionPane.showMessageDialog(this, "Shield is already active. Please wait until it is used before purchasing a new one.");
+                        continue;
+                    }
+                    break;
+                case "Mana Potion (20 Gems)":
+                    if (e.mana >= e.maxMana && (kitsune == null || kitsune.mana >= kitsune.maxMana)) {
+                        JOptionPane.showMessageDialog(this, "Your Mana is already full.");
+                        continue;
+                    }
+                    break;
+            }
+    
             // หัก gem แล้วทำงานตามปุ่ม
             int cost = Integer.parseInt(choice.replaceAll(".*\\((\\d+) Gems\\)", "$1"));
             if (totalGems < cost) {
-                JOptionPane.showMessageDialog(this, "Not enough Gems");
+                JOptionPane.showMessageDialog(this, "Not enough Gems.");
                 continue;
             }
             totalGems -= cost;
@@ -992,7 +1014,7 @@ public class BookwormUI extends JFrame { // Main UI class for Bookworm Puzzle RP
                     break;
     
                 case "Mana Potion (20 Gems)":
-                    player.mana = Math.min(player.maxMana, player.mana + 10);
+                    e.mana = Math.min(e.maxMana, e.mana + 10);
                     if (kitsune != null) kitsune.mana = Math.min(kitsune.maxMana, kitsune.mana + 10);
                     playSound("heal.wav");
                     playerImgLabel.setIcon(icons.get("hero_heal"));
